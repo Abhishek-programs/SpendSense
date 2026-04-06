@@ -1,14 +1,13 @@
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatMonth } from '@/lib/format'
 import { usePulseData } from '@/hooks/usePulseData'
-import { INCOME_BUCKET_ID } from '@/store/transactions'
 import { HeroRing } from '@/components/home/HeroRing'
 import { LivingSection } from '@/components/home/LivingSection'
 import { FutureSection } from '@/components/home/FutureSection'
 import { MonthSnapshotRow } from '@/components/home/MonthSnapshotRow'
+import { usePlaybookStore } from '@/store/playbook'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -18,6 +17,7 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen() {
+  const { userName } = usePlaybookStore()
   const {
     totalIncome,
     available,
@@ -36,8 +36,6 @@ export default function HomeScreen() {
   } = usePulseData()
 
   const monthLabel = formatMonth(monthStart)
-
-  // Filter out BigExpense Debt from Future section per spec
   const futureBuckets = savingsBuckets.filter(b => b.name !== 'BigExpense Debt')
 
   const handleConfirmSavings = async (bucketId: string) => {
@@ -58,7 +56,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -66,7 +64,9 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.greeting}>
+              {getGreeting()}, {userName || 'Friend'}
+            </Text>
             <Text style={styles.monthLabel}>{monthLabel}</Text>
           </View>
           <TouchableOpacity style={styles.notifButton}>
@@ -109,7 +109,7 @@ export default function HomeScreen() {
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 80 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -126,6 +126,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingTop: 64, // Standardized header height
     paddingBottom: 8,
   },
   greeting: {
@@ -148,5 +149,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    borderCurve: 'continuous',
   },
 })

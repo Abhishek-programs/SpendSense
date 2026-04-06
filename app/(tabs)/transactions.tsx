@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatNPRShort, formatDate } from '@/lib/format'
@@ -105,7 +104,7 @@ export default function TransactionsScreen() {
   }, [])
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ledger</Text>
@@ -122,27 +121,31 @@ export default function TransactionsScreen() {
       </View>
 
       {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-        style={styles.filterScroll}
-      >
-        {filters.map(f => {
-          const active = activeFilter === f.key
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              onPress={() => setActiveFilter(active ? 'all' : f.key)}
-            >
-              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+          decelerationRate="fast"
+          snapToAlignment="start"
+        >
+          {filters.map(f => {
+            const active = activeFilter === f.key
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setActiveFilter(active ? 'all' : f.key)}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      </View>
 
       {/* Summary row */}
       <View style={styles.summaryRow}>
@@ -169,6 +172,7 @@ export default function TransactionsScreen() {
         <SectionList
           sections={sections}
           keyExtractor={item => item.id}
+          contentInsetAdjustmentBehavior="automatic"
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionHeaderText}>{section.title}</Text>
@@ -190,11 +194,14 @@ export default function TransactionsScreen() {
               <Text style={styles.emptyText}>No transactions yet</Text>
             </View>
           }
-          contentContainerStyle={sections.length === 0 ? { flex: 1 } : undefined}
+          contentContainerStyle={[
+            styles.listContent,
+            sections.length === 0 && { flex: 1 }
+          ]}
           stickySectionHeadersEnabled={false}
         />
       ) : (
-        <ScrollView>
+        <ScrollView contentInsetAdjustmentBehavior="automatic">
           <ChartsView spendingByBucket={spendingByBucket} />
         </ScrollView>
       )}
@@ -205,12 +212,12 @@ export default function TransactionsScreen() {
         visible={detailVisible}
         onClose={closeDetail}
       />
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  container: {
     flex: 1,
     backgroundColor: colors.pageBg,
   },
@@ -219,7 +226,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 64, // Standardized header height
+    paddingBottom: 12,
   },
   headerTitle: {
     fontSize: 22,
@@ -233,7 +241,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 16, // Extra bottom padding to prevent border clipping
   },
   filterChip: {
     paddingHorizontal: 14,
@@ -242,6 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    borderCurve: 'continuous',
   },
   filterChipActive: {
     backgroundColor: colors.green + '15',
@@ -259,12 +269,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
+    marginTop: 4, // Space from filters
     marginBottom: 12,
     backgroundColor: colors.surface,
     borderRadius: 12,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    borderCurve: 'continuous',
   },
   summaryItem: {
     flex: 1,
@@ -284,6 +296,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
     fontVariant: ['tabular-nums'],
+  },
+  listContent: {
+    paddingBottom: 40,
   },
   sectionHeader: {
     paddingHorizontal: 16,

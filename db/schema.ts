@@ -2,6 +2,7 @@ import { int, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const playbook = sqliteTable('playbook', {
   id: integer('id').primaryKey(),
+  userName: text('user_name'),
   monthlyIncome: real('monthly_income').notNull().default(125000),
   monthStartDay: integer('month_start_day').notNull().default(1),
   fallbackBucketId: text('fallback_bucket_id'),

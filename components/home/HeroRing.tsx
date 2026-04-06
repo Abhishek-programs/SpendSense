@@ -7,8 +7,12 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
+  useAnimatedProps,
+  useDerivedValue,
+  FadeIn,
+  interpolate,
 } from 'react-native-reanimated'
-import Svg, { Circle } from 'react-native-svg'
+import Svg, { Circle, Defs, LinearGradient, Stop, RadialGradient } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR } from '@/lib/format'
@@ -31,6 +35,8 @@ const STROKE = 12
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+
 function getStatus(
   available: number,
   totalIncome: number,
@@ -45,9 +51,8 @@ function getStatus(
   if (flaggedAmount > 0) {
     return { status: 'uncategorized', label: 'Needs attention', icon: 'alert-circle', color: colors.amber }
   }
-  // Budget pacing: if spent proportion > elapsed proportion, caution
   if (totalIncome > 0 && daysRemaining > 0) {
-    const totalDays = 30 // approximate
+    const totalDays = 30
     const elapsed = totalDays - daysRemaining
     const elapsedRatio = elapsed / totalDays
     const spentRatio = totalSpent / (totalIncome - confirmedSavings || 1)
@@ -76,34 +81,67 @@ export function HeroRing({
     available, totalIncome, flaggedAmount, daysRemaining, totalSpent, confirmedSavings,
   )
 
-  // Ring shows how much of spending capacity is used.
-  // Green arc = proportion of income already accounted for (spent + confirmed savings).
-  // Starts grey (nothing spent), fills green as money is allocated.
   const denom = totalIncome > 0 ? totalIncome : 1
-  const usedRatio = Math.max(0, Math.min((totalSpent + confirmedSavings) / denom, 1))
-  const yellowRatio = Math.max(0, Math.min(flaggedAmount / denom, 1 - usedRatio))
-  const greyUnconfirmedRatio = Math.max(0, Math.min(unconfirmedSavings / denom, 1 - usedRatio - yellowRatio))
+  
+  // Shared values for animation
+  const usedRatioSV = useSharedValue(0)
+  const yellowRatioSV = useSharedValue(0)
+  const greyRatioSV = useSharedValue(0)
+  const centerPulse = useSharedValue(0)
 
-  // Green arc — allocated money, starts at 12 o'clock
-  const greenOffset = CIRCUMFERENCE * (1 - usedRatio)
+  useEffect(() => {
+    const targetUsed = Math.max(0, Math.min((totalSpent + confirmedSavings) / denom, 1))
+    const targetYellow = Math.max(0, Math.min(flaggedAmount / denom, 1 - targetUsed))
+    const targetGrey = Math.max(0, Math.min(unconfirmedSavings / denom, 1 - targetUsed - targetYellow))
 
-  // Yellow arc — flagged, positioned after green
-  const yellowDash = CIRCUMFERENCE * yellowRatio
-  const yellowGap = CIRCUMFERENCE * (1 - yellowRatio)
-  const yellowRotation = -90 + usedRatio * 360
+    usedRatioSV.value = withTiming(targetUsed, { duration: 1200, easing: Easing.out(Easing.exp) })
+    yellowRatioSV.value = withTiming(targetYellow, { duration: 1200, easing: Easing.out(Easing.exp) })
+    greyRatioSV.value = withTiming(targetGrey, { duration: 1200, easing: Easing.out(Easing.exp) })
 
-  // Grey unconfirmed savings — positioned after yellow
-  const greyDash = CIRCUMFERENCE * greyUnconfirmedRatio
-  const greyGap = CIRCUMFERENCE * (1 - greyUnconfirmedRatio)
-  const greyRotation = -90 + (usedRatio + yellowRatio) * 360
+    centerPulse.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    )
+  }, [totalSpent, confirmedSavings, flaggedAmount, unconfirmedSavings, denom])
+
+  // Animated props for Green arc
+  const greenProps = useAnimatedProps(() => {
+    const offset = CIRCUMFERENCE * (1 - usedRatioSV.value)
+    return {
+      strokeDashoffset: offset,
+    }
+  })
+
+  // Animated props for Yellow arc
+  const yellowProps = useAnimatedProps(() => {
+    const dash = CIRCUMFERENCE * yellowRatioSV.value
+    const gap = CIRCUMFERENCE * (1 - yellowRatioSV.value)
+    const rotation = -90 + usedRatioSV.value * 360
+    return {
+      strokeDasharray: `${dash} ${gap}`,
+      rotation: rotation,
+    }
+  })
+
+  // Animated props for Grey arc
+  const greyProps = useAnimatedProps(() => {
+    const dash = CIRCUMFERENCE * greyRatioSV.value
+    const gap = CIRCUMFERENCE * (1 - greyRatioSV.value)
+    const rotation = -90 + (usedRatioSV.value + yellowRatioSV.value) * 360
+    return {
+      strokeDasharray: `${dash} ${gap}`,
+      rotation: rotation,
+    }
+  })
 
   // Subtle floating animation for pill
   const pillY = useSharedValue(0)
   useEffect(() => {
     pillY.value = withRepeat(
       withSequence(
-        withTiming(-3, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(3, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(-3, { duration: 2400, easing: Easing.inOut(Easing.ease) }),
+        withTiming(3, { duration: 2400, easing: Easing.inOut(Easing.ease) }),
       ),
       -1,
       true,
@@ -113,8 +151,13 @@ export function HeroRing({
     transform: [{ translateY: pillY.value }],
   }))
 
+  const centerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(centerPulse.value, [0, 1], [1, 1.02]) }],
+    opacity: interpolate(centerPulse.value, [0, 1], [0.95, 1]),
+  }))
+
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(800)} style={styles.container}>
       {/* Floating pill — overlapping ring edge */}
       <Animated.View style={[styles.pill, pillAnimStyle]}>
         <View style={[styles.pillDot, isOverspent && { backgroundColor: colors.red }]} />
@@ -122,7 +165,26 @@ export function HeroRing({
       </Animated.View>
 
       <Svg width={SIZE} height={SIZE}>
-        {/* Background track — the "empty" grey ring */}
+        <Defs>
+          <LinearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={colors.green} stopOpacity="0.8" />
+            <Stop offset="100%" stopColor={colors.green} stopOpacity="1" />
+          </LinearGradient>
+          <LinearGradient id="yellowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={colors.amber} stopOpacity="0.8" />
+            <Stop offset="100%" stopColor={colors.amber} stopOpacity="1" />
+          </LinearGradient>
+          <LinearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={colors.red} stopOpacity="0.8" />
+            <Stop offset="100%" stopColor={colors.red} stopOpacity="1" />
+          </LinearGradient>
+          <RadialGradient id="centerGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <Stop offset="0%" stopColor={statusColor} stopOpacity="0.08" />
+            <Stop offset="100%" stopColor={statusColor} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+
+        {/* Background track */}
         <Circle
           cx={cx}
           cy={cy}
@@ -132,76 +194,76 @@ export function HeroRing({
           fill="none"
         />
 
-        {isOverspent ? (
-          /* Full red ring when overspent */
+        {/* Center Glow */}
+        {!isOverspent && (
           <Circle
             cx={cx}
             cy={cy}
+            r={RADIUS - 20}
+            fill="url(#centerGlow)"
+          />
+        )}
+
+        {isOverspent ? (
+          <AnimatedCircle
+            cx={cx}
+            cy={cy}
             r={RADIUS}
-            stroke={colors.red}
+            stroke="url(#redGrad)"
             strokeWidth={STROKE}
             fill="none"
             strokeLinecap="round"
+            animatedProps={greenProps} // Reuse green props for full ring animation
           />
         ) : (
           <>
-            {/* Grey dashed — unconfirmed savings (committed but not moved) */}
-            {greyUnconfirmedRatio > 0.005 && (
-              <Circle
-                cx={cx}
-                cy={cy}
-                r={RADIUS}
-                stroke={colors.textMuted}
-                strokeWidth={STROKE - 4}
-                fill="none"
-                strokeDasharray={`${greyDash} ${greyGap}`}
-                strokeDashoffset={0}
-                strokeLinecap="round"
-                rotation={greyRotation}
-                origin={`${cx}, ${cy}`}
-                opacity={0.3}
-              />
-            )}
+            {/* Grey dashed — unconfirmed savings */}
+            <AnimatedCircle
+              cx={cx}
+              cy={cy}
+              r={RADIUS}
+              stroke={colors.textMuted}
+              strokeWidth={STROKE - 4}
+              fill="none"
+              strokeLinecap="round"
+              origin={`${cx}, ${cy}`}
+              opacity={0.3}
+              animatedProps={greyProps}
+            />
 
-            {/* Yellow — flagged/uncategorized amount */}
-            {yellowRatio > 0.005 && (
-              <Circle
-                cx={cx}
-                cy={cy}
-                r={RADIUS}
-                stroke={colors.amber}
-                strokeWidth={STROKE}
-                fill="none"
-                strokeDasharray={`${yellowDash} ${yellowGap}`}
-                strokeDashoffset={0}
-                strokeLinecap="round"
-                rotation={yellowRotation}
-                origin={`${cx}, ${cy}`}
-              />
-            )}
+            {/* Yellow — flagged amount */}
+            <AnimatedCircle
+              cx={cx}
+              cy={cy}
+              r={RADIUS}
+              stroke="url(#yellowGrad)"
+              strokeWidth={STROKE}
+              fill="none"
+              strokeLinecap="round"
+              origin={`${cx}, ${cy}`}
+              animatedProps={yellowProps}
+            />
 
-            {/* Green arc — money allocated (spent + confirmed savings) */}
-            {usedRatio > 0.005 && (
-              <Circle
-                cx={cx}
-                cy={cy}
-                r={RADIUS}
-                stroke={colors.green}
-                strokeWidth={STROKE}
-                fill="none"
-                strokeDasharray={`${CIRCUMFERENCE}`}
-                strokeDashoffset={greenOffset}
-                strokeLinecap="round"
-                rotation={-90}
-                origin={`${cx}, ${cy}`}
-              />
-            )}
+            {/* Green arc — money allocated */}
+            <AnimatedCircle
+              cx={cx}
+              cy={cy}
+              r={RADIUS}
+              stroke="url(#greenGrad)"
+              strokeWidth={STROKE}
+              fill="none"
+              strokeDasharray={`${CIRCUMFERENCE}`}
+              strokeLinecap="round"
+              rotation={-90}
+              origin={`${cx}, ${cy}`}
+              animatedProps={greenProps}
+            />
           </>
         )}
       </Svg>
 
       {/* Center text overlay */}
-      <View style={styles.centerText}>
+      <Animated.View style={[styles.centerText, centerAnimStyle]}>
         <Text style={styles.label}>SAFE TO SPEND</Text>
         <Text style={[styles.amount, isOverspent && { color: colors.red }]}>
           {isOverspent ? '-' : ''}NPR {formatNPR(Math.abs(available))}
@@ -211,13 +273,13 @@ export function HeroRing({
           <Ionicons name={statusIcon as any} size={13} color={statusColor} />
           <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Weekly rate — below ring */}
       <Text style={styles.weekly}>
         ≈ NPR {formatNPR(Math.round(weeklyRate))}/week
       </Text>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -284,10 +346,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)',
     elevation: 3,
   },
   pillDot: {

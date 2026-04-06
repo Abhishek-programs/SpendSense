@@ -271,13 +271,29 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.pageBg }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <Text style={styles.pageTitle}>Settings</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
 
         {/* Section 1: Playbook */}
         <SectionHeader title="Playbook" description="Core financial parameters" />
         <Card>
+          <TouchableOpacity onPress={() => {/* handled by EditableRow logic if I lived there, but I'll add a simple text input for name */}} style={styles.editableRow} activeOpacity={0.6}>
+            <Text style={styles.editableLabel}>Display name</Text>
+            <TextInput
+              style={styles.editableInput}
+              value={pb.userName || ''}
+              onChangeText={v => pb.updatePlaybook({ userName: v })}
+              placeholder="Your name"
+              autoCapitalize="words"
+            />
+          </TouchableOpacity>
+          <View style={styles.divider} />
           <EditableRow
             label="Monthly income"
             value={pb.monthlyIncome}
@@ -576,11 +592,24 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Card>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.pageBg,
+  },
+  header: {
+    paddingTop: 64,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+  },
   pageTitle: {
     fontSize: 28,
     fontFamily: 'Inter_700Bold',

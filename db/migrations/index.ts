@@ -67,8 +67,9 @@ CREATE TABLE \`transactions\` (
 );`
 
 const m0001 = `ALTER TABLE \`transactions\` ADD COLUMN \`type\` text DEFAULT 'expense' NOT NULL;`
+const m0002 = `ALTER TABLE \`playbook\` ADD COLUMN \`user_name\` text;`
 
 export const migrations = {
   journal,
-  migrations: { m0000, m0001 },
+  migrations: { m0000, m0001, m0002 },
 }
