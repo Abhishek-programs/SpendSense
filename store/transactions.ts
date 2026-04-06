@@ -27,6 +27,8 @@ interface TransactionsState {
   isLoaded: boolean
   loadTransactions: (monthStart: Date, monthEnd: Date) => Promise<void>
   addTransaction: (txn: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>
+  updateTransaction: (id: string, patch: Partial<Transaction>) => Promise<void>
+  deleteTransaction: (id: string) => Promise<void>
   getSpentByBucket: (bucketId: string) => number
   getConfirmedSavingsBuckets: () => Set<string>
   getTotalIncome: () => number
@@ -71,6 +73,36 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
       const flagged = allTxns.filter(t => t.isFlagged)
       set({ transactions: allTxns, flaggedTransactions: flagged })
     }
+  },
+
+  updateTransaction: async (id, patch) => {
+    const updateData: Record<string, any> = {}
+    if (patch.amount !== undefined) updateData.amount = patch.amount
+    if (patch.merchant !== undefined) updateData.merchant = patch.merchant
+    if (patch.bucketId !== undefined) updateData.bucketId = patch.bucketId
+    if (patch.remarks !== undefined) updateData.remarks = patch.remarks
+    if (patch.isFlagged !== undefined) updateData.isFlagged = patch.isFlagged
+    if (patch.type !== undefined) updateData.type = patch.type
+    if (patch.date !== undefined) updateData.date = patch.date
+    if (patch.source !== undefined) updateData.source = patch.source
+
+    await db.update(transactions).set(updateData).where(eq(transactions.id, id))
+
+    const state = get()
+    const updated = state.transactions.map(t =>
+      t.id === id ? { ...t, ...patch } : t
+    )
+    const flagged = updated.filter(t => t.isFlagged)
+    set({ transactions: updated, flaggedTransactions: flagged })
+  },
+
+  deleteTransaction: async (id) => {
+    await db.delete(transactions).where(eq(transactions.id, id))
+
+    const state = get()
+    const remaining = state.transactions.filter(t => t.id !== id)
+    const flagged = remaining.filter(t => t.isFlagged)
+    set({ transactions: remaining, flaggedTransactions: flagged })
   },
 
   getSpentByBucket: (bucketId: string) => {

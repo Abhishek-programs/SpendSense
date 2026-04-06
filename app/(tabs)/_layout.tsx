@@ -45,12 +45,14 @@ export default function TabsLayout() {
             tabBarIcon: ({ focused }) => <TabBarIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
           }}
         />
+
         <Tabs.Screen
           name="transactions"
           options={{
             tabBarIcon: ({ focused }) => <TabBarIcon name={focused ? 'list' : 'list-outline'} focused={focused} />,
           }}
         />
+
         {/* Center FAB — custom button opens ManualEntrySheet, no navigation */}
         <Tabs.Screen
           name="add"

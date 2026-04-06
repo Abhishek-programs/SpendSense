@@ -61,11 +61,12 @@
 **Done when:** `#fun coffee` → Fun bucket. Known merchant → mapped bucket. Unknown → fallback + flag.
 
 ### Step 6: Ledger screen (Transactions tab)
-- [ ] `app/(tabs)/transactions.tsx` — transaction list grouped by date, search/filter
-- [ ] `components/transactions/TransactionRow.tsx` — single transaction row
-- [ ] `components/transactions/TransactionDetailSheet.tsx` — bottom sheet for edit/delete
-- [ ] `components/transactions/ChartsView.tsx` — toggle between list and charts (react-native-gifted-charts)
-- [ ] Swipe or tap to edit/delete, bucket reassign
+- [x] `app/(tabs)/transactions.tsx` — transaction list grouped by date, filter chips, summary row, list/chart toggle
+- [x] `components/transactions/TransactionRow.tsx` — merchant, bucket pill, amount (red/green), flagged border
+- [x] `components/transactions/TransactionDetailSheet.tsx` — edit bucket/remarks, delete with confirmation
+- [x] `components/transactions/ChartsView.tsx` — spending by bucket bar chart (react-native-gifted-charts)
+- [x] `store/transactions.ts` — added `updateTransaction()`, `deleteTransaction()`
+- [x] Filter chips: All | per-bucket | Savings | Income | Flagged
 
 **Done when:** Transactions tab shows all this-month entries. User can view details, edit bucket, delete. Charts toggle works.
 
@@ -109,15 +110,17 @@
 **Done when:** fresh install shows onboarding. Completing it seeds personalized values and lands on Pulse.
 
 ### Step 10: Settings screen
-- [ ] `app/(tabs)/settings.tsx` — playbook editor
-- [ ] Edit income, month start day, EF floor
-- [ ] Bucket management: add/edit/reorder/deactivate buckets
-- [ ] Keyword mappings: add/edit/delete
-- [ ] Sure-shot merchants: add/edit/delete
-- [ ] Notification toggles (wired in step 12)
-- [ ] CSV export of transactions
+- [x] `app/(tabs)/settings.tsx` — 7-section settings: Playbook, Buckets, Keywords, Merchants, Notifications, Data, Developer
+- [x] Playbook: inline-editable income, month start day, EF floor
+- [x] Buckets: list + tap-to-edit + add + long-press deactivate
+- [x] Keyword mappings: list + add + delete
+- [x] Sure-shot merchants: list + add + delete
+- [x] Notification toggles (local state, wired in step 12)
+- [x] CSV export (builds CSV string from this-month transactions)
+- [x] Developer: "Clear All Data" — clears tables, re-seeds defaults, reloads stores
+- [x] `store/buckets.ts` — added CRUD: addBucket, updateBucket, deactivateBucket, addKeywordMapping, deleteKeywordMapping, addSureShotMerchant, deleteSureShotMerchant
 
-**Done when:** all playbook values editable. Bucket/keyword/merchant CRUD works. CSV export downloads file.
+**Done when:** all playbook values editable. Bucket/keyword/merchant CRUD works. CSV export works. Dev reset works.
 
 ---
 
