@@ -8,60 +8,57 @@
 ## Phase 1 — Foundation
 
 ### Step 1: DB schema + Drizzle setup
-- [x] `db/schema.ts` — 7 tables (playbook, buckets, transactions, goals, keywordMappings, sureShotMerchants, netWorthSnapshots)
+- [x] `db/schema.ts` — 7 tables + `type` column on transactions (m0001 migration)
 - [x] `db/client.ts` — expo-sqlite + Drizzle init, `runMigrations()`
 - [x] `db/seed.ts` — seed default playbook, 8 buckets, keyword mappings
-- [x] `db/migrations/` — generated migration for all tables
+- [x] `db/migrations/` — m0000 (all tables) + m0001 (transaction type column)
 - [x] `constants/defaults.ts` — default bucket values, income, EF floor, keyword map
 
 **Done when:** migrations run on fresh install, seed populates defaults, TypeScript compiles clean.
 
-### Step 2: Pulse screen UI shell
-- [x] `app/(tabs)/index.tsx` — Home/Dashboard layout
-- [x] `app/(tabs)/_layout.tsx` — Tab bar with center `[+]` FAB
+### Step 2: Pulse screen — "Safe to Spend" dashboard
+- [x] `app/(tabs)/index.tsx` — Home screen: HeroRing + Living + Future + Snapshot
+- [x] `app/(tabs)/_layout.tsx` — Tab bar with center `[+]` FAB opening ManualEntrySheet
+- [x] `components/home/HeroRing.tsx` — SVG ring (green/yellow/grey/red arcs), "Safe to Spend" center text, animated "N days left" pill, weekly rate below ring
+- [x] `components/home/LivingSection.tsx` — spending buckets with progress bars
+- [x] `components/home/FutureSection.tsx` — savings checklist, one-way checkbox, strikethrough on confirm, auto-logs transaction
+- [x] `components/home/MonthSnapshotRow.tsx` — "Income: 1.25L | Saved: 50K | Spent: 22K"
+- [x] `hooks/usePulseData.ts` — centralized calculations (available, flagged, savings split, weekly rate, days remaining)
 - [x] `components/ui/Card.tsx`, `ProgressBar.tsx`, `Chip.tsx` — UI primitives
-- [x] `components/home/NetWorthCard.tsx` — net worth display
-- [x] `components/home/BucketRow.tsx` — spending bucket row with progress bar
-- [x] `components/home/SavingsRow.tsx` — savings/investment row with confirm toggle
-- [x] `components/home/MonthHealthCard.tsx` — 4-row health summary
 - [x] `constants/colors.ts` — design tokens
 - [x] `lib/format.ts` — formatNPR, formatNPRShort, formatDate, formatMonth
-- [x] `lib/month.ts` — getMonthRange (custom month start day)
+- [x] `lib/month.ts` — getMonthRange, getDaysRemaining
 
-**Done when:** Pulse screen renders all sections with layout and styling matching spec.
+**Done when:** Pulse shows "Safe to Spend" ring with real data. Living progress bars and Future checklist functional. Checking a savings item logs transaction and updates ring.
 
 ### Step 3: Zustand stores + wire Pulse to live data
 - [x] `store/playbook.ts` — income, month start day, EF floor, onboarded flag
 - [x] `store/buckets.ts` — bucket list, keyword mappings, sure-shot merchants
-- [x] `store/transactions.ts` — month transactions, flagged list, spentByBucket
+- [x] `store/transactions.ts` — month transactions, flagged list, spentByBucket, getTotalIncome, addTransaction, ensureSalaryTransaction
 - [x] `store/goals.ts` — goal definitions
-- [x] `app/_layout.tsx` — DB init -> seed -> hydrate all stores on launch
-- [x] `app/(tabs)/index.tsx` — buckets, spending, savings, month health from stores
+- [x] `app/_layout.tsx` — DB init -> seed -> hydrate all stores -> auto-salary on launch
 
-**Done when:** Pulse shows real seeded data. No hardcoded values in UI (except net worth which needs snapshot data).
+**Done when:** Stores hydrate from DB. Salary auto-created on month start. All Pulse data is live.
 
 ---
 
 ## Phase 2 — Core Transaction Flow
 
 ### Step 4: Manual Entry sheet
-- [x] `components/manual-entry/ManualEntrySheet.tsx` — bottom sheet with form fields (amount, merchant, bucket picker, date, remarks)
-- [x] Wire `[+]` FAB in tab layout to open ManualEntrySheet
-- [x] `store/transactions.ts` — `addTransaction()` writes to DB + refreshes state
-- [x] Auto-categorization call on save (integrated with step 5)
-- [x] Income entry: monthly salary auto-creates on month_start_day, manual income toggle for extras
-- [x] `db/schema.ts` — added `type` column (expense|income) to transactions
-- [x] `db/migrations/` — m0001 migration for type column
-- [x] `@react-native-community/datetimepicker` installed for date picker
+- [x] `components/manual-entry/ManualEntrySheet.tsx` — Modal form: amount (large/centered), expense/income toggle, bucket chips, merchant, remarks (#tag hint), date picker, recurring toggle
+- [x] Wire `[+]` FAB via custom `tabBarButton` to open ManualEntrySheet
+- [x] `lib/categorize.ts` — 3-step auto-categorization (remarks prefix > sure-shot merchant > fallback + flag)
+- [x] Income handling: salary auto-created, manual income toggle for extras, `_income` sentinel bucket
+- [x] `@react-native-community/datetimepicker` installed
 
-**Done when:** user can tap `[+]`, fill form, save transaction, see it reflected in Pulse bucket totals.
+**Done when:** user can tap `[+]`, fill form, save transaction, see Pulse update reactively.
 
 ### Step 5: Categorization engine
-- [x] `lib/categorize.ts` — 3-step priority: remarks prefix > sure-shot merchant > fallback bucket
-- [x] Wire into ManualEntrySheet save flow
+- [x] `lib/categorize.ts` — 3-step priority logic
+- [x] Wired into ManualEntrySheet save flow
 - [ ] Wire into OCR flow (step 11)
 
-**Done when:** `#fun coffee` auto-assigns to Fun bucket. Known merchant (NTC) auto-assigns to Core Living. Unknown merchant saves to fallback + flags.
+**Done when:** `#fun coffee` → Fun bucket. Known merchant → mapped bucket. Unknown → fallback + flag.
 
 ### Step 6: Ledger screen (Transactions tab)
 - [ ] `app/(tabs)/transactions.tsx` — transaction list grouped by date, search/filter
@@ -76,7 +73,7 @@
 - [ ] `components/flagged/FlaggedTransactionPrompt.tsx` — surfaces one flagged txn at a time on app open
 - [ ] Bucket picker for reassignment
 - [ ] Option to add merchant as sure-shot for future auto-categorization
-- [ ] Flagged banner on Pulse links to this flow
+- [ ] Yellow ring segment on Pulse reflects flagged amount
 
 **Done when:** opening app with flagged transactions shows prompt. User can assign bucket or dismiss. Sure-shot merchant option works.
 
@@ -138,7 +135,7 @@
 
 ### Step 12: Notifications
 - [ ] `expo-notifications` setup + permission request
-- [ ] Nudge triggers (from screen-flows.md): budget breach, savings reminder, EF warning, recurring draft confirm
+- [ ] Nudge triggers: budget breach, savings reminder, EF warning, recurring draft confirm
 - [ ] Max 1 per day, quiet hours 10pm-8am
 - [ ] Individual toggle per nudge type (wired from Settings)
 
