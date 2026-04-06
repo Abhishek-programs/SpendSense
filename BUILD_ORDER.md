@@ -45,17 +45,20 @@
 ## Phase 2 — Core Transaction Flow
 
 ### Step 4: Manual Entry sheet
-- [ ] `components/manual-entry/ManualEntrySheet.tsx` — bottom sheet with form fields (amount, merchant, bucket picker, date, remarks)
-- [ ] Wire `[+]` FAB in tab layout to open ManualEntrySheet
-- [ ] `store/transactions.ts` — `addTransaction()` writes to DB + refreshes state
-- [ ] Auto-categorization call on save (step 5 dependency — use fallback bucket until then)
-- [ ] Income entry: monthly income auto-creates as draft on month_start_day, confirm within 3 days
+- [x] `components/manual-entry/ManualEntrySheet.tsx` — bottom sheet with form fields (amount, merchant, bucket picker, date, remarks)
+- [x] Wire `[+]` FAB in tab layout to open ManualEntrySheet
+- [x] `store/transactions.ts` — `addTransaction()` writes to DB + refreshes state
+- [x] Auto-categorization call on save (integrated with step 5)
+- [x] Income entry: monthly salary auto-creates on month_start_day, manual income toggle for extras
+- [x] `db/schema.ts` — added `type` column (expense|income) to transactions
+- [x] `db/migrations/` — m0001 migration for type column
+- [x] `@react-native-community/datetimepicker` installed for date picker
 
 **Done when:** user can tap `[+]`, fill form, save transaction, see it reflected in Pulse bucket totals.
 
 ### Step 5: Categorization engine
-- [ ] `lib/categorize.ts` — 3-step priority: remarks prefix > sure-shot merchant > fallback bucket
-- [ ] Wire into ManualEntrySheet save flow
+- [x] `lib/categorize.ts` — 3-step priority: remarks prefix > sure-shot merchant > fallback bucket
+- [x] Wire into ManualEntrySheet save flow
 - [ ] Wire into OCR flow (step 11)
 
 **Done when:** `#fun coffee` auto-assigns to Fun bucket. Known merchant (NTC) auto-assigns to Core Living. Unknown merchant saves to fallback + flags.

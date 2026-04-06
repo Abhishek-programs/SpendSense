@@ -66,7 +66,9 @@ CREATE TABLE \`transactions\` (
 \`created_at\` text NOT NULL
 );`
 
+const m0001 = `ALTER TABLE \`transactions\` ADD COLUMN \`type\` text DEFAULT 'expense' NOT NULL;`
+
 export const migrations = {
   journal,
-  migrations: { m0000 },
+  migrations: { m0000, m0001 },
 }

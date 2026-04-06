@@ -34,6 +34,7 @@ export const sureShotMerchants = sqliteTable('sure_shot_merchants', {
 
 export const transactions = sqliteTable('transactions', {
   id: text('id').primaryKey(),
+  type: text('type', { enum: ['expense', 'income'] }).notNull().default('expense'),
   amount: real('amount').notNull(),
   merchant: text('merchant'),
   bucketId: text('bucket_id').notNull(),
