@@ -1,11 +1,9 @@
 import '../global.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Stack, router } from 'expo-router'
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter'
 import * as SplashScreen from 'expo-splash-screen'
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator'
-import { db, ensureMigrationsApplied } from '@/db/client'
-import { migrations } from '@/db/migrations'
+import { runMigrations } from '@/db/client'
 import { seedDefaults } from '@/db/seed'
 import { usePlaybookStore } from '@/store/playbook'
 import { useBucketsStore } from '@/store/buckets'
@@ -22,26 +20,23 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   })
-  const { success: migrationSuccess, error: migrationError } = useMigrations(db, migrations)
+  const [dbReady, setDbReady] = useState(false)
   const { loadPlaybook, monthStartDay, isOnboarded, isLoaded: playbookLoaded } = usePlaybookStore()
   const { loadBuckets } = useBucketsStore()
   const { loadTransactions } = useTransactionsStore()
   const { loadGoals } = useGoalsStore()
 
   useEffect(() => {
-    if (migrationSuccess || migrationError) {
-      // Ensure migrations are applied (fallback if useMigrations didn't work)
-      ensureMigrationsApplied()
-        .then(() => seedDefaults())
-        .then(() => loadPlaybook())
-        .catch(() => {
-          // If migrations still fail, just try loading anyway
-          loadPlaybook()
-        })
-    }
-  }, [migrationSuccess, migrationError])
+    runMigrations()
+      .then(() => seedDefaults())
+      .then(() => loadPlaybook())
+      .catch((e) => {
+        console.error('DB setup failed:', e)
+        loadPlaybook() // still try to load in case tables already exist
+      })
+      .finally(() => setDbReady(true))
+  }, [])
 
-  // Load remaining stores after playbook is loaded (we need monthStartDay)
   useEffect(() => {
     if (!playbookLoaded) return
     const { start, end } = getMonthRange(monthStartDay)
@@ -50,24 +45,22 @@ export default function RootLayout() {
     loadGoals()
   }, [playbookLoaded])
 
-  // Hide splash and redirect once everything is ready
   useEffect(() => {
-    const ready = (fontsLoaded || fontError) && (migrationSuccess || migrationError) && playbookLoaded
-    if (!ready) return
+    if (!(fontsLoaded || fontError) || !dbReady || !playbookLoaded) return
     SplashScreen.hideAsync()
     if (!isOnboarded) {
       router.replace('/onboarding')
     }
-  }, [fontsLoaded, fontError, migrationSuccess, migrationError, playbookLoaded, isOnboarded])
+  }, [fontsLoaded, fontError, dbReady, playbookLoaded, isOnboarded])
 
-  // Safety net: force hide splash after 5s in case something hangs
+  // Safety net: force hide splash after 5s
   useEffect(() => {
     const t = setTimeout(() => SplashScreen.hideAsync(), 5000)
     return () => clearTimeout(t)
   }, [])
 
   if (!fontsLoaded && !fontError) return null
-  if (!migrationSuccess && !migrationError) return null
+  if (!dbReady) return null
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
