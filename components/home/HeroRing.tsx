@@ -26,8 +26,8 @@ interface HeroRingProps {
   confirmedSavings: number
 }
 
-const SIZE = 224
-const STROKE = 13
+const SIZE = 248
+const STROKE = 12
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   centerText: {
     position: 'absolute',
-    top: 16,
+    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   amount: {
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -273,8 +273,8 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    top: 20,
-    right: 24,
+    top: 28,
+    right: 30,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',

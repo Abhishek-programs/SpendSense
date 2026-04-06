@@ -47,7 +47,7 @@
 ### Step 4: Manual Entry sheet
 - [x] `components/manual-entry/ManualEntrySheet.tsx` — Modal form: amount (large/centered), expense/income toggle, bucket chips, merchant, remarks (#tag hint), date picker, recurring toggle
 - [x] Wire `[+]` FAB via custom `tabBarButton` to open ManualEntrySheet
-- [x] `lib/categorize.ts` — 3-step auto-categorization (remarks prefix > sure-shot merchant > fallback + flag)
+- [x] `lib/categorize.ts` — 3-step auto-categorization (remarks suffix "keyword -" > sure-shot merchant > fallback + flag)
 - [x] Income handling: salary auto-created, manual income toggle for extras, `_income` sentinel bucket
 - [x] `@react-native-community/datetimepicker` installed
 
@@ -58,7 +58,7 @@
 - [x] Wired into ManualEntrySheet save flow
 - [ ] Wire into OCR flow (step 11)
 
-**Done when:** `#fun coffee` → Fun bucket. Known merchant → mapped bucket. Unknown → fallback + flag.
+**Done when:** `coffee fun -` → Fun bucket. Known merchant → mapped bucket. Unknown → fallback + flag.
 
 ### Step 6: Ledger screen (Transactions tab)
 - [x] `app/(tabs)/transactions.tsx` — transaction list grouped by date, filter chips, summary row, list/chart toggle
@@ -112,7 +112,7 @@
 ### Step 10: Settings screen
 - [x] `app/(tabs)/settings.tsx` — 7-section settings: Playbook, Buckets, Keywords, Merchants, Notifications, Data, Developer
 - [x] Playbook: inline-editable income, month start day, EF floor
-- [x] Buckets: list + tap-to-edit + add + long-press deactivate
+- [x] Buckets: list + tap-to-edit + add + explicit delete button
 - [x] Keyword mappings: list + add + delete
 - [x] Sure-shot merchants: list + add + delete
 - [x] Notification toggles (local state, wired in step 12)

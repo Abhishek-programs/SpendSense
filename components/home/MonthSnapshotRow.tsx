@@ -11,17 +11,19 @@ interface MonthSnapshotRowProps {
 export function MonthSnapshotRow({ income, saved, spent }: MonthSnapshotRowProps) {
   return (
     <View style={styles.container}>
-      <View style={[styles.box, { backgroundColor: colors.greenFill }]}>
-        <Text style={[styles.boxLabel, { color: colors.green }]}>Income</Text>
-        <Text style={[styles.boxValue, { color: colors.green }]}>{formatNPRShort(income)}</Text>
+      <View style={styles.item}>
+        <Text style={[styles.value, { color: colors.green }]}>{formatNPRShort(income)}</Text>
+        <Text style={styles.label}>Income</Text>
       </View>
-      <View style={[styles.box, { backgroundColor: '#F0F9FF' }]}>
-        <Text style={[styles.boxLabel, { color: '#0369A1' }]}>Saved</Text>
-        <Text style={[styles.boxValue, { color: '#0369A1' }]}>{formatNPRShort(saved)}</Text>
+      <View style={styles.divider} />
+      <View style={styles.item}>
+        <Text style={[styles.value, { color: '#0369A1' }]}>{formatNPRShort(saved)}</Text>
+        <Text style={styles.label}>Saved</Text>
       </View>
-      <View style={[styles.box, { backgroundColor: '#FEE2E2' }]}>
-        <Text style={[styles.boxLabel, { color: colors.red }]}>Spent</Text>
-        <Text style={[styles.boxValue, { color: colors.red }]}>{formatNPRShort(spent)}</Text>
+      <View style={styles.divider} />
+      <View style={styles.item}>
+        <Text style={[styles.value, { color: colors.red }]}>{formatNPRShort(spent)}</Text>
+        <Text style={styles.label}>Spent</Text>
       </View>
     </View>
   )
@@ -30,23 +32,32 @@ export function MonthSnapshotRow({ income, saved, spent }: MonthSnapshotRowProps
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
+    alignItems: 'center',
+    marginHorizontal: 16,
     marginTop: 4,
-  },
-  box: {
-    flex: 1,
+    backgroundColor: colors.surface,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  boxLabel: {
+  item: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.border,
+  },
+  label: {
     fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 2,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 2,
   },
-  boxValue: {
-    fontSize: 15,
+  value: {
+    fontSize: 16,
     fontFamily: 'Inter_700Bold',
     fontVariant: ['tabular-nums'],
   },

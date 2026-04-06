@@ -108,7 +108,7 @@ export default function TransactionsScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transactions</Text>
+        <Text style={styles.headerTitle}>Ledger</Text>
         <TouchableOpacity
           onPress={() => setViewMode(v => v === 'list' ? 'chart' : 'list')}
           hitSlop={12}
@@ -126,6 +126,7 @@ export default function TransactionsScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
+        style={styles.filterScroll}
       >
         {filters.map(f => {
           const active = activeFilter === f.key
@@ -145,19 +146,21 @@ export default function TransactionsScreen() {
 
       {/* Summary row */}
       <View style={styles.summaryRow}>
-        <View style={[styles.summaryBox, { backgroundColor: colors.greenFill }]}>
-          <Text style={[styles.summaryLabel, { color: colors.green }]}>Income</Text>
+        <View style={styles.summaryItem}>
           <Text style={[styles.summaryValue, { color: colors.green }]}>{formatNPRShort(totalIncome)}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Income</Text>
         </View>
-        <View style={[styles.summaryBox, { backgroundColor: '#FEE2E2' }]}>
-          <Text style={[styles.summaryLabel, { color: colors.red }]}>Spent</Text>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
           <Text style={[styles.summaryValue, { color: colors.red }]}>{formatNPRShort(totalSpent)}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Spent</Text>
         </View>
-        <View style={[styles.summaryBox, { backgroundColor: net >= 0 ? '#F0F9FF' : colors.amberFill }]}>
-          <Text style={[styles.summaryLabel, { color: net >= 0 ? '#0369A1' : colors.amber }]}>Net</Text>
-          <Text style={[styles.summaryValue, { color: net >= 0 ? '#0369A1' : colors.amber }]}>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryValue, { color: net >= 0 ? colors.green : colors.red }]}>
             {net < 0 ? '-' : ''}{formatNPRShort(Math.abs(net))}
           </Text>
+          <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Net</Text>
         </View>
       </View>
 
@@ -223,6 +226,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
   },
+  filterScroll: {
+    flexGrow: 0,
+  },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
@@ -251,23 +257,31 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
-  summaryBox: {
-    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: colors.surface,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.border,
   },
   summaryLabel: {
     fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 2,
+    fontFamily: 'Inter_400Regular',
+    marginTop: 2,
   },
   summaryValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Inter_700Bold',
     fontVariant: ['tabular-nums'],
   },

@@ -11,6 +11,7 @@ import {
   Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { Card } from '@/components/ui/Card'
 import { usePlaybookStore } from '@/store/playbook'
@@ -307,19 +308,23 @@ export default function SettingsScreen() {
           {activeBuckets.map((b, i) => (
             <View key={b.id}>
               {i > 0 && <View style={styles.divider} />}
-              <TouchableOpacity
-                style={styles.bucketRow}
-                onPress={() => expandBucket(b)}
-                onLongPress={() => confirmDeactivate(b)}
-                activeOpacity={0.6}
-              >
-                <Text style={{ fontSize: 18, marginRight: 8 }}>{b.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bucketName}>{b.name}</Text>
-                  <Text style={styles.bucketAmount}>NPR {formatNPR(b.monthlyAmount)}/mo</Text>
-                </View>
-                <TypeBadge type={b.type} />
-              </TouchableOpacity>
+              <View style={styles.bucketRow}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                  onPress={() => expandBucket(b)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={{ fontSize: 18, marginRight: 8 }}>{b.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.bucketName}>{b.name}</Text>
+                    <Text style={styles.bucketAmount}>NPR {formatNPR(b.monthlyAmount)}/mo</Text>
+                  </View>
+                  <TypeBadge type={b.type} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => confirmDeactivate(b)} hitSlop={8} style={{ marginLeft: 12 }}>
+                  <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
 
               {expandedBucketId === b.id && (
                 <View style={styles.bucketEditor}>
@@ -427,18 +432,18 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Section 3: Keyword Mappings */}
-        <SectionHeader title="Keyword Mappings" description="Remark prefixes (#keyword) auto-categorize transactions" />
+        <SectionHeader title="Keyword Mappings" description='End remarks with "keyword -" to auto-categorize (e.g. "lunch core -")' />
         <Card>
           {bs.keywordMappings.map((km, i) => (
             <View key={km.id}>
               {i > 0 && <View style={styles.divider} />}
               <View style={styles.mappingRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.mappingKeyword}>#{km.keyword}</Text>
+                  <Text style={styles.mappingKeyword}>{km.keyword} -</Text>
                   <Text style={styles.mappingBucket}>{getBucketName(km.bucketId)}</Text>
                 </View>
                 <TouchableOpacity onPress={() => bs.deleteKeywordMapping(km.id)} hitSlop={8}>
-                  <Text style={{ color: colors.red, fontSize: 18 }}>x</Text>
+                  <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -452,7 +457,7 @@ export default function SettingsScreen() {
                 style={styles.input}
                 value={newKeyword}
                 onChangeText={setNewKeyword}
-                placeholder="Keyword (without #)"
+                placeholder="Keyword (e.g. core)"
                 placeholderTextColor={colors.textMuted}
                 autoFocus
                 autoCapitalize="none"
@@ -491,7 +496,7 @@ export default function SettingsScreen() {
                   <Text style={styles.mappingBucket}>{getBucketName(m.bucketId)}</Text>
                 </View>
                 <TouchableOpacity onPress={() => bs.deleteSureShotMerchant(m.id)} hitSlop={8}>
-                  <Text style={{ color: colors.red, fontSize: 18 }}>x</Text>
+                  <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>

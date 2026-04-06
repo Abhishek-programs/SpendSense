@@ -1,5 +1,5 @@
 // 3-step auto-categorization (priority order):
-// 1. Remarks prefix — remark starts with #keyword → mapped bucket. Always wins.
+// 1. Remarks suffix — remark ends with "keyword -" → mapped bucket. Always wins.
 // 2. Sure-shot merchant — unambiguous merchant → mapped bucket.
 // 3. Fallback — fallback bucket, mark as flagged.
 
@@ -12,9 +12,9 @@ export function categorize(opts: {
 }): { bucketId: string; isFlagged: boolean } {
   const { remarks, merchant, keywords, sureShotMerchants, fallbackBucketId } = opts
 
-  // Step 1: Remarks prefix — #keyword at start of remarks
+  // Step 1: Remarks suffix — "keyword -" at end of remarks (e.g. "lunch core -")
   if (remarks) {
-    const match = remarks.trim().match(/^#(\S+)/)
+    const match = remarks.trim().match(/(\S+)\s*-\s*$/)
     if (match) {
       const tag = match[1].toLowerCase()
       const mapping = keywords.find(k => k.keyword.toLowerCase() === tag)
