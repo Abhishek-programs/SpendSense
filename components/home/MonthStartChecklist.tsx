@@ -15,6 +15,7 @@ interface MonthStartChecklistProps {
   visible: boolean
   items: ChecklistItem[]
   onCompleteItem: (id: string) => void
+  onConfirm: (items: ChecklistItem[]) => void
   onDismiss: () => void
 }
 
@@ -22,9 +23,11 @@ export function MonthStartChecklist({
   visible, 
   items, 
   onCompleteItem, 
+  onConfirm,
   onDismiss 
 }: MonthStartChecklistProps) {
   const allDone = items.every(i => i.completed)
+  const anyDone = items.some(i => i.completed)
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -71,15 +74,30 @@ export function MonthStartChecklist({
             ))}
           </ScrollView>
 
-          <TouchableOpacity 
-            style={[styles.doneButton, !allDone && styles.doneButtonDisabled]}
-            onPress={onDismiss}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.doneButtonText}>
-              {allDone ? "Let's crush this month!" : "Finish these later"}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.doneButton, !anyDone && styles.doneButtonDisabled]}
+              onPress={() => {
+                if (anyDone) {
+                  onConfirm(items.filter(i => i.completed))
+                }
+              }}
+              disabled={!anyDone}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.doneButtonText}>
+                {allDone ? "Let's crush this month!" : anyDone ? "Confirm Selected" : "Select items to confirm"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.laterButton}
+              onPress={onDismiss}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.laterButtonText}>I'll fill this later</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -144,9 +162,8 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   itemCompleted: {
-    opacity: 0.6,
-    borderColor: 'transparent',
-    backgroundColor: colors.divider,
+    borderColor: colors.green,
+    backgroundColor: colors.greenFill,
   },
   checkbox: {
     width: 24,
@@ -167,8 +184,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   itemLabelCompleted: {
-    textDecorationLine: 'line-through',
-    color: colors.textMuted,
+    color: colors.textPrimary,
   },
   itemAmount: {
     fontSize: 12,
@@ -177,23 +193,34 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   itemAmountCompleted: {
-    color: colors.textMuted,
+    color: colors.textSecond,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    gap: 12,
   },
   doneButton: {
-    marginHorizontal: 24,
-    marginTop: 24,
     backgroundColor: colors.green,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
   },
   doneButtonDisabled: {
-    backgroundColor: colors.textMuted,
-    opacity: 0.5,
+    backgroundColor: colors.border,
   },
   doneButtonText: {
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
     color: '#FFFFFF',
+  },
+  laterButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  laterButtonText: {
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
   },
 })

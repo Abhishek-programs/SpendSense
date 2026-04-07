@@ -2,17 +2,15 @@ import { useState, useEffect } from 'react'
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
-import { formatMonth } from '@/lib/format'
 import { usePulseData } from '@/hooks/usePulseData'
 import { HeroRing } from '@/components/home/HeroRing'
 import { LivingSection } from '@/components/home/LivingSection'
 import { FutureSection } from '@/components/home/FutureSection'
-import { MonthSnapshotRow } from '@/components/home/MonthSnapshotRow'
 import { NetWorthCard } from '@/components/home/NetWorthCard'
 import { FlaggedTransactionPrompt } from '@/components/flagged/FlaggedTransactionPrompt'
 import { MonthStartChecklist } from '@/components/home/MonthStartChecklist'
 import { usePlaybookStore } from '@/store/playbook'
-import { useTransactionsStore } from '@/store/transactions'
+import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -55,35 +53,72 @@ export default function HomeScreen() {
 
   const [promptVisible, setPromptVisible] = useState(false)
   const [checklistVisible, setChecklistVisible] = useState(false)
-  const [checklistItems, setChecklistItems] = useState([
-    { id: 'income', label: 'Confirm Salary Received', amount: monthlyIncome, completed: false },
-    { id: 'sip', label: 'Monthly SIP / Investments', amount: 20000, completed: false }, 
-    { id: 'ef', label: 'Contribution to Emergency Fund', amount: 5000, completed: false },
-  ])
+
+  // Build checklist items dynamically from savings/investment buckets
+  const buildChecklistItems = () => {
+    const items = [
+      { id: 'income', label: 'Confirm Salary Received', amount: monthlyIncome, bucketId: 'income', completed: false },
+    ]
+    savingsBuckets.forEach(b => {
+      items.push({
+        id: b.id,
+        label: b.name,
+        amount: b.monthlyAmount,
+        bucketId: b.id,
+        completed: false,
+      })
+    })
+    return items
+  }
+
+  const [checklistItems, setChecklistItems] = useState(buildChecklistItems)
 
   const flagged = transactions.filter(t => t.isFlagged)
 
-  const monthLabel = formatMonth(monthStart)
   const currentMonthKey = new Date().toISOString().slice(0, 7) // YYYY-MM
   
   useEffect(() => {
-    const today = new Date().getDate()
-    if (today === monthStartDay && lastChecklistMonth !== currentMonthKey) {
+    if (lastChecklistMonth !== currentMonthKey) {
       setChecklistVisible(true)
     }
-  }, [monthStartDay, lastChecklistMonth, currentMonthKey])
+  }, [lastChecklistMonth, currentMonthKey])
 
-  const handleCompleteChecklistItem = (id: string) => {
-    setChecklistItems(prev => {
-      const next = prev.map(item => item.id === id ? { ...item, completed: !item.completed } : item)
-      if (next.every(i => i.completed)) {
-        // All items done, update the store
-        updatePlaybook({ lastChecklistMonth: currentMonthKey })
+  const handleCompleteChecklist = async (completedItems: any[]) => {
+    // Use the month start date (respects user's monthStartDay setting)
+    const txnDate = monthStart.toISOString()
+
+    for (const item of completedItems) {
+      if (item.id === 'income') {
+        await addTransaction({
+          type: 'income',
+          amount: item.amount || monthlyIncome,
+          merchant: 'Salary',
+          bucketId: INCOME_BUCKET_ID,
+          date: txnDate,
+          source: 'manual',
+          remarks: '__salary__',
+          parsedTxnId: null,
+          isFlagged: false,
+          isRecurringDraft: false,
+        })
+      } else {
+        await addTransaction({
+          type: 'expense',
+          amount: item.amount,
+          merchant: item.label,
+          bucketId: item.bucketId,
+          date: txnDate,
+          source: 'manual',
+          remarks: '__savings_confirm__',
+          parsedTxnId: null,
+          isFlagged: false,
+          isRecurringDraft: false,
+        })
       }
-      return next
-    })
+    }
+    await updatePlaybook({ lastChecklistMonth: currentMonthKey })
+    setChecklistVisible(false)
   }
-  const futureBuckets = savingsBuckets.filter(b => b.name !== 'BigExpense Debt')
 
   const handleConfirmSavings = async (bucketId: string) => {
     const bucket = savingsBuckets.find(b => b.id === bucketId)
@@ -102,12 +137,27 @@ export default function HomeScreen() {
     })
   }
 
+  const futureBuckets = savingsBuckets.filter(b => b.name !== 'BigExpense Debt')
+
   return (
     <View style={styles.container}>
+      {/* Header (outside scroll so it stays fixed-position at top) */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>
+            {getGreeting()}, {userName || 'there'}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.notifButton} onPress={() => setChecklistVisible(true)} hitSlop={12}>
+          <Ionicons name="list-outline" size={22} color={colors.textSecond} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+
         {/* Flagged Banner */}
         {flagged.length > 0 && (
           <TouchableOpacity 
@@ -127,18 +177,6 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              {getGreeting()}, {userName || 'there'}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.notifButton} hitSlop={12}>
-            <Ionicons name="notifications-outline" size={22} color={colors.textSecond} />
-          </TouchableOpacity>
-        </View>
 
         {/* Net Worth Card */}
         <NetWorthCard
@@ -175,13 +213,6 @@ export default function HomeScreen() {
           onConfirm={handleConfirmSavings}
         />
 
-        {/* Monthly Snapshot */}
-        <MonthSnapshotRow
-          income={totalIncome}
-          saved={confirmedSavings}
-          spent={totalSpent}
-        />
-
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 80 }} />
       </ScrollView>
@@ -195,7 +226,10 @@ export default function HomeScreen() {
       <MonthStartChecklist
         visible={checklistVisible}
         items={checklistItems}
-        onCompleteItem={handleCompleteChecklistItem}
+        onCompleteItem={(id) => {
+          setChecklistItems(prev => prev.map(item => item.id === id ? { ...item, completed: !item.completed } : item))
+        }}
+        onConfirm={handleCompleteChecklist}
         onDismiss={() => setChecklistVisible(false)}
       />
     </View>
@@ -208,7 +242,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pageBg,
   },
   scrollContent: {
-    paddingTop: 8,
     paddingHorizontal: 16,
   },
   flaggedBanner: {
@@ -217,7 +250,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B10',
     borderRadius: 16,
     padding: 12,
-    marginTop: 64,
+    marginTop: 8,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#F59E0B20',
@@ -246,18 +279,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingTop: 24,
-    paddingBottom: 8,
+    paddingTop: 64,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
   },
   greeting: {
     fontSize: 22,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
-  },
-  monthLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textSecond,
   },
   notifButton: {
     width: 40,

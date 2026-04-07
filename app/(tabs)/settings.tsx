@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   StyleSheet,
   Pressable,
+  Animated,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -48,24 +49,33 @@ function EditableRow({
   onSave,
   prefix,
   keyboardType = 'numeric',
+  onSaved,
 }: {
   label: string
   value: number
   onSave: (v: number) => void
   prefix?: string
   keyboardType?: 'numeric' | 'number-pad'
+  onSaved?: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
 
   const startEdit = () => {
+    if (editing) return
     setDraft(String(value))
     setEditing(true)
   }
 
   const save = () => {
     const num = parseInt(draft, 10)
-    if (!isNaN(num) && num >= 0) onSave(num)
+    if (!isNaN(num) && num >= 0 && num !== value) {
+      onSave(num)
+      setJustSaved(true)
+      onSaved?.()
+      setTimeout(() => setJustSaved(false), 2000)
+    }
     setEditing(false)
   }
 
@@ -73,21 +83,93 @@ function EditableRow({
     <TouchableOpacity onPress={startEdit} style={styles.editableRow} activeOpacity={0.6}>
       <Text style={styles.editableLabel}>{label}</Text>
       {editing ? (
-        <TextInput
-          style={styles.editableInput}
-          value={draft}
-          onChangeText={setDraft}
-          keyboardType={keyboardType}
-          onBlur={save}
-          onSubmitEditing={save}
-          autoFocus
-          selectTextOnFocus
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={save} hitSlop={12}>
+            <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={styles.editableInput}
+            value={draft}
+            onChangeText={setDraft}
+            keyboardType={keyboardType}
+            onSubmitEditing={save}
+            autoFocus
+            selectTextOnFocus
+          />
+        </View>
       ) : (
-        <Text style={styles.editableValue}>
-          {prefix}
-          {prefix ? formatNPR(value) : String(value)}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {justSaved && <Text style={{ color: colors.green, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Saved ✓</Text>}
+          <Text style={styles.editableValue}>
+            {prefix}
+            {prefix ? formatNPR(value) : String(value)}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  )
+}
+
+function EditableStringRow({
+  label,
+  value,
+  onSave,
+  placeholder,
+  onSaved,
+}: {
+  label: string
+  value: string
+  onSave: (v: string) => void
+  placeholder?: string
+  onSaved?: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
+
+  const startEdit = () => {
+    if (editing) return
+    setDraft(value)
+    setEditing(true)
+  }
+
+  const save = () => {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== value) {
+      onSave(trimmed)
+      setJustSaved(true)
+      onSaved?.()
+      setTimeout(() => setJustSaved(false), 2000)
+    }
+    setEditing(false)
+  }
+
+  return (
+    <TouchableOpacity onPress={startEdit} style={styles.editableRow} activeOpacity={0.6}>
+      <Text style={styles.editableLabel}>{label}</Text>
+      {editing ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={save} hitSlop={12}>
+            <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.editableInput, { textAlign: 'right' }]}
+            value={draft}
+            onChangeText={setDraft}
+            onSubmitEditing={save}
+            placeholder={placeholder}
+            autoCapitalize="words"
+            autoFocus
+            returnKeyType="done"
+          />
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {justSaved && <Text style={{ color: colors.green, fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Saved ✓</Text>}
+          <Text style={styles.editableValue}>
+            {value || placeholder}
+          </Text>
+        </View>
       )}
     </TouchableOpacity>
   )
@@ -139,11 +221,26 @@ function BucketPicker({
   )
 }
 
+function useSavedFeedback() {
+  const opacity = useRef(new Animated.Value(0)).current
+  const show = () => {
+    opacity.setValue(1)
+    Animated.timing(opacity, {
+      toValue: 0,
+      duration: 1500,
+      delay: 400,
+      useNativeDriver: true,
+    }).start()
+  }
+  return { opacity, show }
+}
+
 export default function SettingsScreen() {
   const pb = usePlaybookStore()
   const bs = useBucketsStore()
   const txnStore = useTransactionsStore()
   const goalsStore = useGoalsStore()
+  const saved = useSavedFeedback()
 
   const activeBuckets = bs.buckets.filter(b => b.isActive)
 
@@ -278,27 +375,28 @@ export default function SettingsScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
+          <Animated.Text style={[styles.headerSaved, { opacity: saved.opacity }]}>
+            Saved
+          </Animated.Text>
         </View>
 
         {/* Section 1: Playbook */}
         <SectionHeader title="Playbook" description="Core financial parameters" />
         <Card>
-          <TouchableOpacity onPress={() => {/* handled by EditableRow logic if I lived there, but I'll add a simple text input for name */}} style={styles.editableRow} activeOpacity={0.6}>
-            <Text style={styles.editableLabel}>Display name</Text>
-            <TextInput
-              style={styles.editableInput}
-              value={pb.userName || ''}
-              onChangeText={v => pb.updatePlaybook({ userName: v })}
-              placeholder="Your name"
-              autoCapitalize="words"
-            />
-          </TouchableOpacity>
+          <EditableStringRow
+            label="Display name"
+            value={pb.userName || ''}
+            onSave={v => pb.updatePlaybook({ userName: v })}
+            onSaved={saved.show}
+            placeholder="Your name"
+          />
           <View style={styles.divider} />
           <EditableRow
             label="Monthly income"
             value={pb.monthlyIncome}
             prefix="NPR "
             onSave={v => pb.updatePlaybook({ monthlyIncome: v })}
+            onSaved={saved.show}
           />
           <View style={styles.divider} />
           <EditableRow
@@ -308,6 +406,7 @@ export default function SettingsScreen() {
               if (v >= 1 && v <= 28) pb.updatePlaybook({ monthStartDay: v })
             }}
             keyboardType="number-pad"
+            onSaved={saved.show}
           />
           <View style={styles.divider} />
           <EditableRow
@@ -315,6 +414,7 @@ export default function SettingsScreen() {
             value={pb.efFloor}
             prefix="NPR "
             onSave={v => pb.updatePlaybook({ efFloor: v })}
+            onSaved={saved.show}
           />
         </Card>
 
@@ -602,8 +702,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pageBg,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 64,
     paddingBottom: 12,
+  },
+  headerSaved: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green,
   },
   headerTitle: {
     fontSize: 22,
@@ -654,12 +762,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: colors.green,
+    borderBottomColor: colors.border,
     paddingVertical: 2,
     paddingHorizontal: 4,
     minWidth: 80,
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
+  },
+  nameInput: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textPrimary,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    minWidth: 80,
+    textAlign: 'right',
+  },
+  savedLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green,
   },
   bucketRow: {
     flexDirection: 'row',

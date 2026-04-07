@@ -21,6 +21,10 @@
 - [x] `components/home/LivingSection.tsx` — spending buckets with progress bars
 - [x] `components/home/FutureSection.tsx` — savings checklist (one-way check)
 - [x] `components/home/MonthSnapshotRow.tsx` — Basic Income/Saved/Spent summary
+- [ ] The future section needs to show the buckets from savings and investment, if new bucket is added, reflect there.
+- [ ] Completely remove the BigExpense Debt bucket. User should be able to add that custom if needed.
+- [ ] Start the screens title from same distance from top of phone. Make design consistent between pages
+- [ ] Make sure the net worth calculation are working properly. The pulse page does not require 2 section showing same info. If netw worth is added, remove the last compontent showing income, saved and spent
 - [ ] **[TODO]** Expand Net Worth Card: Tap for asset breakdown (EF, MacBook, Shares)
 
 ### Step 3: Zustand stores + wire Pulse to live data
@@ -49,6 +53,7 @@
 - [x] `app/(tabs)/transactions.tsx` — List grouped by date, Filter chips, Summary row
 - [x] `components/transactions/TransactionRow.tsx` — bucket pill, merchant, amount
 - [x] `components/transactions/TransactionDetailSheet.tsx` — reassign bucket, delete
+- [ ] Make sure if the section like spending by bucket has no content then have a info or placeholder informing what is meant to be here and when it will show
 - [ ] **[TODO]** `ChartsView.tsx` — Donut breakdown, 6-Month Trend, Milestone markers
 - [ ] **[TODO]** Annual View toggle (PRD F11)
 
@@ -67,6 +72,7 @@
 - [ ] `components/goals/GoalDetailSheet.tsx` — Details view, history list, edit button
 - [ ] `lib/projection.ts` — Linear math for "Days remaining" and "Projected Date"
 - [ ] `components/goals/SensitivityNudge.tsx` — "Add NPR X/month to finish Y months sooner"
+- [ ] Emergency Fund is a default bucket, which should be shown in the goals page as well.
 
 ### Step 9: Onboarding & Setup
 - [ ] `app/onboarding/` — 7-step first-launch wizard (Phase 1 built core 2 steps)
@@ -77,6 +83,7 @@
   5. [ ] Initial balances (EF, shares)
   6. [ ] Add sure-shot merchants (optional)
   7. [x] Confirmation + mark `isOnboarded = true`
+  8. [ ] Make Emergency Fund a mandatory and pre calculated bucket which operates depending on the EF floor. Allow user to set the monthly savings like currrently, but also suggest what should be saved depending on the EF floor.
 - [x] `store/playbook.ts` — `setOnboarded()` logic
 - [x] `app/(tabs)/settings.tsx` — Playbook edit, Bucket/Keyword/Merchant CRUD
 - [x] Developer: Clear All Data / Reset
@@ -86,11 +93,14 @@
 ## Phase 4 — Advanced Features (Completed ✅)
 
 ### Step 10: Month Start Checklist (PRD F10)
-- [x] Modal/Banner on 1st of month
+- [x] Modal/Banner on start of month. but show them if not ticked off before.
 - [x] Confirm salary received, confirm fixed transfers (SIP, EF, etc.)
-- [x] Auto-create recurring drafts (PRD F5)
+- [ ] User could come to the page when ever, if they have not filled for that month, show. And when they tick off, update the last_checklist_month in playbook. And add relevant transaction
+- [ ] Auto-create recurring drafts (PRD F5)
 
 ### Step 11: OCR Scanner (F1)
+- [ ] `lib/ocr.ts` — `rn-mlkit-ocr` + Regex templates for eSewa, Khalti, major Banks
+- [ ] Validation checklist ("NPR", "Amount", "Success" keywords)
 - [ ] Pre-fill feedback loop into ManualEntrySheet
 
 ### Step 12: Notifications & Nudges (F9)

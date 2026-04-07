@@ -1,8 +1,15 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPRShort } from '@/lib/format'
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface NetWorthCardProps {
   netWorth: number
@@ -23,11 +30,16 @@ export function NetWorthCard({
 }: NetWorthCardProps) {
   const [expanded, setExpanded] = useState(false)
 
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    setExpanded(!expanded)
+  }
+
   return (
     <TouchableOpacity 
       style={styles.container} 
       activeOpacity={0.9}
-      onPress={() => setExpanded(!expanded)}
+      onPress={toggleExpand}
     >
       <View style={styles.header}>
         <View style={styles.mainInfo}>
@@ -59,15 +71,21 @@ export function NetWorthCard({
         </View>
       </View>
 
-      {expanded && breakdown.length > 0 && (
+      {expanded && (
         <View style={styles.breakdown}>
           <View style={styles.divider} />
-          {breakdown.map((item, index) => (
-            <View key={item.label} style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>{item.label}</Text>
-              <Text style={styles.breakdownValue}>{formatNPRShort(item.value)}</Text>
-            </View>
-          ))}
+          {breakdown.length > 0 ? (
+            breakdown.map((item) => (
+              <View key={item.label} style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>{item.label}</Text>
+                <Text style={styles.breakdownValue}>{formatNPRShort(item.value)}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyBreakdown}>
+              Add goals in the Vault tab to see your asset breakdown here.
+            </Text>
+          )}
         </View>
       )}
     </TouchableOpacity>
@@ -83,11 +101,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderCurve: 'continuous',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
   },
   header: {
     flexDirection: 'row',
@@ -162,5 +175,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
+  },
+  emptyBreakdown: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 8,
   },
 })

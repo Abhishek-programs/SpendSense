@@ -30,5 +30,15 @@ export async function runMigrations() {
     }
   }
 
+  try {
+    sqlite.execSync(`ALTER TABLE playbook ADD COLUMN user_name TEXT;`)
+  } catch { }
+
+  try {
+    sqlite.execSync(`ALTER TABLE playbook ADD COLUMN last_checklist_month TEXT;`)
+  } catch {
+    // Column already exists or table doesn't exist yet, ignore
+  }
+
   await migrate(db, migrations)
 }

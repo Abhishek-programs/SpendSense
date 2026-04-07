@@ -98,6 +98,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pageBg,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 64,
     paddingBottom: 12,
