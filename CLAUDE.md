@@ -19,6 +19,7 @@ Personal finance Android app. React Native + Expo. NPR-denominated, Nepal-focuse
 | Charts | react-native-gifted-charts |
 | Image pick | expo-image-picker (screenshot OCR flow) |
 | OCR | rn-mlkit-ocr (Google ML Kit, fully on-device) |
+| Overlay (V2) | Custom Kotlin `OverlayService` + `OverlayModule` + ML Kit |
 | Fonts | expo-google-fonts (Inter) |
 
 No tests in V1. No testing libraries. No error boundaries beyond what screen specs require.
@@ -252,7 +253,7 @@ export function projectGoalCompletion(opts: {
 - CSV export
 
 **Out of V1:**
-- Bubble overlay / SYSTEM_ALERT_WINDOW → V2
+- Bubble overlay / SYSTEM_ALERT_WINDOW → **V2** (architecture fully planned — see `reference/OVERLAY_LLM_PROMPT.md`)
 - Share intent capture → V2
 - SMS/email reading → V2
 - Dark mode → V2
@@ -260,6 +261,36 @@ export function projectGoalCompletion(opts: {
 - SIP portfolio tracking (NAV, returns) → V2
 - iOS → V3
 - Cloud sync / backup → V3
+
+---
+
+## Bubble Overlay (V2 — Android Only)
+
+**Architecture:** Custom Kotlin native modules registered via `ReactPackage`. Lives entirely in `android/app/src/main/java/com/spendsense/overlay/`.
+
+**Core modules:**
+| File | Role |
+|---|---|
+| `OverlayService.kt` | Foreground service, holds `WindowManager` bubble, orchestrates capture pipeline |
+| `FloatingBubbleView.kt` | Draggable `FrameLayout` drawn by `WindowManager TYPE_APPLICATION_OVERLAY` |
+| `ScreenCaptureManager.kt` | `MediaProjection` + `ImageReader` → `Bitmap` |
+| `MLKitOCRProcessor.kt` | ML Kit Text Recognition on captured bitmap |
+| `OcrResultBridge.kt` | Emits `onOcrResult` event to RN JS thread |
+| `OverlayModule.kt` | JS-callable API: `startOverlay`, `stopOverlay`, `requestPermission`, `requestMediaProjection` |
+| `OverlayPackage.kt` | Registers modules with React Native |
+
+**JS layer:**
+- `lib/overlay.ts` — typed wrapper around `NativeModules.OverlayModule`
+- `hooks/useOverlay.ts` — subscribes to `onOcrResult`, runs categorize → DB write → Toast
+- `app/_layout.tsx` — add `useOverlay()` call
+- `app/(tabs)/settings.tsx` — add Overlay toggle section
+
+**Key rules for V2:**
+- All overlay code is Android-only (`Platform.OS === 'android'` guards in all JS)
+- Never modify `lib/categorize.ts`, `store/`, `db/schema.ts` — overlay is purely additive
+- OCR and DB writes on non-main thread (Kotlin coroutines / JS thread via bridge)
+- Transaction source = `'overlay'` (add to source union type in schema migration if needed)
+- Full LLM-ready prompt in `reference/OVERLAY_LLM_PROMPT.md`
 
 ---
 

@@ -55,10 +55,12 @@
 - [ ] **[TODO]** Annual View toggle (PRD F11)
 
 ### Step 7: Flagged transaction prompt (PRD F4 / Flow 9)
-- [ ] `app/(tabs)/index.tsx` — Amber banner shown when `transactions.filter(t => t.isFlagged)` is not empty
-- [ ] `components/flagged/FlaggedTransactionPrompt.tsx` — Bottom sheet identifying "Needs Review" items
-- [ ] Sequential walkthrough of flagged items (1 of N)
-- [ ] Assignment clears flag bit in DB
+- [x] `app/(tabs)/index.tsx` — Amber banner shown when `transactions.filter(t => t.isFlagged)` is not empty
+- [x] `components/flagged/FlaggedTransactionPrompt.tsx` — Bottom sheet identifying "Needs Review" items
+- [x] Sequential walkthrough of flagged items (1 of N)
+- [x] Assignment clears flag bit in DB
+- [x] "Always use this bucket for [merchant]" adds to sure_shot_merchants
+- [x] Banner disappears when all flags cleared, HeroRing updates reactively
 
 ---
 
@@ -112,15 +114,53 @@
 
 ## Remaining Work
 
-### Step 11: OCR Scanner (F1)
-- [ ] `lib/ocr.ts` — `rn-mlkit-ocr` + Regex templates for eSewa, Khalti, major Banks
-- [ ] Validation checklist ("NPR", "Amount", "Success" keywords)
-- [ ] Pre-fill feedback loop into ManualEntrySheet
+### Step 11: OCR Scanner — V1 (image picker flow)
+- [ ] `lib/ocr.ts` — add `parseOcrText()` with regex for eSewa, Khalti, NMB, Global IME
+- [ ] Validation: confirm NPR amount matched before pre-filling form
+- [ ] Pre-fill `ManualEntrySheet` from parsed fields (amount, merchant)
+- [ ] Wire `expo-image-picker` → OCR → pre-fill → user confirms
 
 ### Step 12: Notifications & Nudges (F9)
-- [ ] `expo-notifications` 1-per-day limit logic
-- [ ] Quiet hours (10pm - 8am)
+- [ ] Add `expo-notifications` plugin to `app.json`
+- [ ] `lib/notifications.ts` — 1-per-day limit logic, quiet hours (10pm–8am)
 - [ ] Nudge triggers: 80% ceiling, investment pending, EF milestone
+- [ ] Permission prompt on first app open (Android + iOS)
+
+---
+
+## V2 — Bubble Overlay (separate effort, Android only)
+
+> Full architecture + LLM-ready implementation prompt: `reference/OVERLAY_LLM_PROMPT.md`
+
+### Phase 1: Bubble infrastructure (no OCR)
+- [ ] `android/.../overlay/OverlayService.kt` — Foreground service + WindowManager
+- [ ] `android/.../overlay/FloatingBubbleView.kt` — Draggable green bubble
+- [ ] `android/.../overlay/OverlayModule.kt` + `OverlayPackage.kt` — RN bridge
+- [ ] `AndroidManifest.xml` — FOREGROUND_SERVICE + media_projection service declaration
+- [ ] `MainApplication.kt` — register OverlayPackage
+- [ ] `lib/overlay.ts` — JS wrapper
+- [ ] Settings toggle (start/stop bubble)
+- [ ] **Done when:** bubble appears over banking app, drags, dismisses ✅
+
+### Phase 2: Screen capture
+- [ ] `android/.../overlay/ScreenCaptureManager.kt` — MediaProjection → Bitmap
+- [ ] `OverlayModule.requestMediaProjectionPermission()` — one-time permission dialog
+- [ ] Wire tap → capture → debug toast with bitmap dimensions
+- [ ] **Done when:** tap bubble → toast shows "Captured 1080×2340" ✅
+
+### Phase 3: OCR pipeline
+- [ ] `android/.../overlay/MLKitOCRProcessor.kt` — ML Kit on captured bitmap
+- [ ] `android/.../overlay/OcrResultBridge.kt` — emits `onOcrResult` to JS
+- [ ] `hooks/useOverlay.ts` — receive event, log raw text
+- [ ] Add ML Kit gradle dep (`com.google.mlkit:text-recognition:16.0.1`)
+- [ ] **Done when:** tap over eSewa → toast shows extracted text ✅
+
+### Phase 4: Categorize + save
+- [ ] Extend `lib/ocr.ts` with `parseOcrText()` (amount/merchant regex)
+- [ ] Complete `hooks/useOverlay.ts` — categorize → addTransaction → toast
+- [ ] Add `useOverlay()` to `app/_layout.tsx`
+- [ ] Add `'overlay'` to transaction source union + migration if needed
+- [ ] **Done when:** silent end-to-end flow, transaction in Ledger ✅
 
 ---
 
