@@ -19,6 +19,8 @@ export const DEFAULT_BUCKETS: DefaultBucket[] = [
   { name: 'BigExpense Debt', type: 'savings', monthlyAmount: 10000, color: '#14B8A6', icon: '🏦' },
 ]
 
+export const EF_BUCKET_ID = 'ef'
+
 export const DEFAULT_INCOME = 125000
 export const DEFAULT_EF_FLOOR = 150000
 export const DEFAULT_MONTH_START_DAY = 1
