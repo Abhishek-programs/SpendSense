@@ -124,10 +124,12 @@
 - [ ] Wire `expo-image-picker` → OCR → pre-fill → user confirms
 
 ### Step 12: Notifications & Nudges (F9)
-- [ ] Add `expo-notifications` plugin to `app.json`
-- [ ] `lib/notifications.ts` — 1-per-day limit logic, quiet hours (10pm–8am)
-- [ ] Nudge triggers: 80% ceiling, investment pending, EF milestone
-- [ ] Permission prompt on first app open (Android + iOS)
+- [x] `expo-notifications` plugin added to `app.json`, Android channel setup
+- [x] `lib/notifications.ts` — 1-per-day cap, quiet hours (10pm–8am), priority scheduling
+- [x] Nudge triggers: 80%/100% budget, savings unconfirmed 3d, EF milestones, flagged 3d+
+- [x] Permission request on first open after onboarding
+- [x] Settings toggles wired to playbook store
+- [x] `checkAndScheduleAll()` called on app open from `_layout.tsx`
 
 ---
 
