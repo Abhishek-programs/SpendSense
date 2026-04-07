@@ -20,6 +20,7 @@ export const buckets = sqliteTable('buckets', {
   icon: text('icon').notNull().default('💰'),
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  showOnHome: integer('show_on_home', { mode: 'boolean' }).notNull().default(true),
 })
 
 export const keywordMappings = sqliteTable('keyword_mappings', {

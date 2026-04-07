@@ -11,6 +11,8 @@ import { FlaggedTransactionPrompt } from '@/components/flagged/FlaggedTransactio
 import { MonthStartChecklist } from '@/components/home/MonthStartChecklist'
 import { usePlaybookStore } from '@/store/playbook'
 import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
+import { formatMonth } from '@/lib/format'
+import { MonthSnapshotRow } from '@/components/home/MonthSnapshotRow'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -75,6 +77,7 @@ export default function HomeScreen() {
 
   const flagged = transactions.filter(t => t.isFlagged)
 
+  const monthLabel = formatMonth(monthStart)
   const currentMonthKey = new Date().toISOString().slice(0, 7) // YYYY-MM
   
   useEffect(() => {
@@ -137,7 +140,7 @@ export default function HomeScreen() {
     })
   }
 
-  const futureBuckets = savingsBuckets.filter(b => b.name !== 'BigExpense Debt')
+  const futureBuckets = savingsBuckets
 
   return (
     <View style={styles.container}>
@@ -198,6 +201,13 @@ export default function HomeScreen() {
           weeklyRate={weeklyRate}
           totalSpent={totalSpent}
           confirmedSavings={confirmedSavings}
+        />
+
+        {/* Monthly Snapshot */}
+        <MonthSnapshotRow
+          income={totalIncome}
+          saved={confirmedSavings}
+          spent={totalSpent}
         />
 
         {/* Living — Spending */}
