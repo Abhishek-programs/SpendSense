@@ -5,80 +5,94 @@ import { Ionicons } from '@expo/vector-icons'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { colors } from '@/constants/colors'
 import { usePlaybookStore } from '@/store/playbook'
+import { db } from '@/db/client'
+import { netWorthSnapshots } from '@/db/schema'
 
-export default function OnboardingMoneyScreen() {
-  const [income, setIncome] = useState('125000')
-  const [startDay, setStartDay] = useState('1')
-  const { updatePlaybook } = usePlaybookStore()
+export default function OnboardingBalancesScreen() {
+  const { setOnboarded } = usePlaybookStore()
 
-  const handleNext = async () => {
-    const incValue = parseFloat(income) || 125000
-    const dayValue = parseInt(startDay) || 1
+  const [efBalance, setEfBalance] = useState('')
+  const [equityBalance, setEquityBalance] = useState('')
 
-    await updatePlaybook({
-      monthlyIncome: incValue,
-      monthStartDay: Math.max(1, Math.min(31, dayValue))
-    })
-    router.push('/onboarding/buckets')
+  const handleFinish = async () => {
+    const ef = parseFloat(efBalance) || 0
+    const equity = parseFloat(equityBalance) || 0
+    const totalAssets = ef + equity
+
+    // Seed initial net worth snapshot
+    if (totalAssets > 0) {
+      await db.insert(netWorthSnapshots).values({
+        snapshotDate: new Date().toISOString(),
+        totalAssets,
+        totalLiabilities: 0,
+        note: 'Initial balance from onboarding',
+      })
+    }
+
+    await setOnboarded()
+    router.replace('/(tabs)')
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Animated.View entering={FadeInDown.duration(800).delay(200)}>
           <View style={styles.iconContainer}>
-            <Ionicons name="wallet" size={32} color={colors.green} />
+            <Ionicons name="cash" size={32} color={colors.green} />
           </View>
-          <Text style={styles.title}>Financial Playbook</Text>
-          <Text style={styles.subtitle}>Set up your baseline. You can adjust this later in settings.</Text>
+          <Text style={styles.title}>Starting Balances</Text>
+          <Text style={styles.subtitle}>
+            How much have you already saved? This helps us track your progress from day one. You can skip this and add later.
+          </Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(800).delay(400)} style={styles.formArea}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>MONTHLY TAKE-HOME MONEY</Text>
+            <Text style={styles.label}>CURRENT EMERGENCY FUND</Text>
             <View style={styles.inputWrapper}>
               <Text style={styles.prefix}>NPR</Text>
               <TextInput
                 style={styles.input}
-                placeholder="125,000"
+                placeholder="0"
                 placeholderTextColor={colors.textMuted}
-                value={income}
-                onChangeText={setIncome}
+                value={efBalance}
+                onChangeText={setEfBalance}
                 keyboardType="numeric"
               />
             </View>
+            <Text style={styles.hint}>How much you currently have saved as emergency fund</Text>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>MONTH START DATE</Text>
+            <Text style={styles.label}>CURRENT EQUITY / SHARES VALUE</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="calendar-outline" size={20} color={colors.textSecond} style={{ marginRight: 8 }} />
+              <Text style={styles.prefix}>NPR</Text>
               <TextInput
                 style={styles.input}
-                placeholder="1"
+                placeholder="0"
                 placeholderTextColor={colors.textMuted}
-                value={startDay}
-                onChangeText={setStartDay}
+                value={equityBalance}
+                onChangeText={setEquityBalance}
                 keyboardType="numeric"
-                maxLength={2}
               />
-              <Text style={styles.suffix}>of the month</Text>
             </View>
+            <Text style={styles.hint}>Total value of shares, SIPs, or other investments</Text>
           </View>
         </Animated.View>
 
         <View style={styles.spacer} />
 
         <Animated.View entering={FadeInRight.duration(600).delay(600)}>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleNext}
-          >
-            <Text style={styles.buttonText}>Next</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          <TouchableOpacity style={styles.button} onPress={handleFinish}>
+            <Text style={styles.buttonText}>Get Started</Text>
+            <Ionicons name="rocket" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.skipButton} onPress={handleFinish}>
+            <Text style={styles.skipText}>Skip for now</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -94,7 +108,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 32,
-    paddingTop: 100,
+    paddingTop: 80,
     paddingBottom: 60,
   },
   iconContainer: {
@@ -107,17 +121,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     marginBottom: 12,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'Inter_400Regular',
     color: colors.textSecond,
-    marginBottom: 48,
-    lineHeight: 24,
+    marginBottom: 40,
+    lineHeight: 22,
   },
   formArea: {
     gap: 32,
@@ -144,17 +158,17 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginRight: 12,
   },
-  suffix: {
-    fontSize: 18,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textSecond,
-    marginLeft: 12,
-  },
   input: {
     fontSize: 24,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
     flex: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  hint: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
   },
   spacer: {
     flex: 1,
@@ -169,11 +183,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 8,
     borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.2)',
   },
   buttonText: {
     fontSize: 18,
     fontFamily: 'Inter_600SemiBold',
     color: '#fff',
+  },
+  skipButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  skipText: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
   },
 })
