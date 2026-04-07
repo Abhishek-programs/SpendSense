@@ -1,15 +1,8 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPRShort } from '@/lib/format'
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface NetWorthCardProps {
   netWorth: number
