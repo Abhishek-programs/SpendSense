@@ -50,9 +50,9 @@
 - [x] `app/(tabs)/transactions.tsx` — List grouped by date, Filter chips, Summary row
 - [x] `components/transactions/TransactionRow.tsx` — bucket pill, merchant, amount
 - [x] `components/transactions/TransactionDetailSheet.tsx` — reassign bucket, delete
-- [ ] Make sure if the section like spending by bucket has no content then have a info or placeholder informing what is meant to be here and when it will show
-- [ ] **[TODO]** `ChartsView.tsx` — Donut breakdown, 6-Month Trend, Milestone markers
-- [ ] **[TODO]** Annual View toggle (PRD F11)
+- [x] `ChartsView.tsx` — Horizontal bar chart with green/amber/red thresholds, 6-month trend, annual view
+- [x] Annual View toggle wired to period prop
+- [x] Empty states for no data and insufficient history
 
 ### Step 7: Flagged transaction prompt (PRD F4 / Flow 9)
 - [x] `app/(tabs)/index.tsx` — Amber banner shown when `transactions.filter(t => t.isFlagged)` is not empty
