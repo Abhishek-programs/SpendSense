@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
@@ -7,7 +8,11 @@ import { HeroRing } from '@/components/home/HeroRing'
 import { LivingSection } from '@/components/home/LivingSection'
 import { FutureSection } from '@/components/home/FutureSection'
 import { MonthSnapshotRow } from '@/components/home/MonthSnapshotRow'
+import { NetWorthCard } from '@/components/home/NetWorthCard'
+import { FlaggedTransactionPrompt } from '@/components/flagged/FlaggedTransactionPrompt'
+import { MonthStartChecklist } from '@/components/home/MonthStartChecklist'
 import { usePlaybookStore } from '@/store/playbook'
+import { useTransactionsStore } from '@/store/transactions'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -17,7 +22,14 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen() {
-  const { userName } = usePlaybookStore()
+  const { transactions } = useTransactionsStore()
+  const { 
+    userName, 
+    monthStartDay, 
+    monthlyIncome, 
+    lastChecklistMonth, 
+    updatePlaybook 
+  } = usePlaybookStore()
   const {
     totalIncome,
     available,
@@ -33,9 +45,44 @@ export default function HomeScreen() {
     confirmedSavingIds,
     monthStart,
     addTransaction,
+    netWorth,
+    monthGrowth,
+    totalAssets,
+    totalLiabilities,
+    savingsRate,
+    assetBreakdown,
   } = usePulseData()
 
+  const [promptVisible, setPromptVisible] = useState(false)
+  const [checklistVisible, setChecklistVisible] = useState(false)
+  const [checklistItems, setChecklistItems] = useState([
+    { id: 'income', label: 'Confirm Salary Received', amount: monthlyIncome, completed: false },
+    { id: 'sip', label: 'Monthly SIP / Investments', amount: 20000, completed: false }, 
+    { id: 'ef', label: 'Contribution to Emergency Fund', amount: 5000, completed: false },
+  ])
+
+  const flagged = transactions.filter(t => t.isFlagged)
+
   const monthLabel = formatMonth(monthStart)
+  const currentMonthKey = new Date().toISOString().slice(0, 7) // YYYY-MM
+  
+  useEffect(() => {
+    const today = new Date().getDate()
+    if (today === monthStartDay && lastChecklistMonth !== currentMonthKey) {
+      setChecklistVisible(true)
+    }
+  }, [monthStartDay, lastChecklistMonth, currentMonthKey])
+
+  const handleCompleteChecklistItem = (id: string) => {
+    setChecklistItems(prev => {
+      const next = prev.map(item => item.id === id ? { ...item, completed: !item.completed } : item)
+      if (next.every(i => i.completed)) {
+        // All items done, update the store
+        updatePlaybook({ lastChecklistMonth: currentMonthKey })
+      }
+      return next
+    })
+  }
   const futureBuckets = savingsBuckets.filter(b => b.name !== 'BigExpense Debt')
 
   const handleConfirmSavings = async (bucketId: string) => {
@@ -61,18 +108,47 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Flagged Banner */}
+        {flagged.length > 0 && (
+          <TouchableOpacity 
+            style={styles.flaggedBanner}
+            onPress={() => setPromptVisible(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.flaggedIconBg}>
+              <Ionicons name="alert-circle" size={20} color={colors.amber} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.flaggedTitle}>
+                {flagged.length} transaction{flagged.length > 1 ? 's' : ''} need confirmation
+              </Text>
+              <Text style={styles.flaggedSub}>Tap to assign correct buckets</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>
-              {getGreeting()}, {userName || 'Friend'}
+              {getGreeting()}, {userName || 'there'}
             </Text>
-            <Text style={styles.monthLabel}>{monthLabel}</Text>
           </View>
-          <TouchableOpacity style={styles.notifButton}>
+          <TouchableOpacity style={styles.notifButton} hitSlop={12}>
             <Ionicons name="notifications-outline" size={22} color={colors.textSecond} />
           </TouchableOpacity>
         </View>
+
+        {/* Net Worth Card */}
+        <NetWorthCard
+          netWorth={netWorth}
+          monthGrowth={monthGrowth}
+          assets={totalAssets}
+          liabilities={totalLiabilities}
+          savingsRate={savingsRate}
+          breakdown={assetBreakdown.map(a => ({ label: a.name, value: a.value }))}
+        />
 
         {/* Hero Ring */}
         <HeroRing
@@ -109,6 +185,19 @@ export default function HomeScreen() {
         {/* Bottom spacer for tab bar */}
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      <FlaggedTransactionPrompt 
+        visible={promptVisible}
+        flaggedTransactions={flagged}
+        onClose={() => setPromptVisible(false)}
+      />
+
+      <MonthStartChecklist
+        visible={checklistVisible}
+        items={checklistItems}
+        onCompleteItem={handleCompleteChecklistItem}
+        onDismiss={() => setChecklistVisible(false)}
+      />
     </View>
   )
 }
@@ -120,20 +209,50 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 8,
+    paddingHorizontal: 16,
+  },
+  flaggedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B10',
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 64,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B20',
+    borderCurve: 'continuous',
+  },
+  flaggedIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  flaggedTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+  },
+  flaggedSub: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecond,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 64, // Standardized header height
+    paddingTop: 24,
     paddingBottom: 8,
   },
   greeting: {
     fontSize: 22,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
-    marginBottom: 2,
   },
   monthLabel: {
     fontSize: 14,

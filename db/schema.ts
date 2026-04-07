@@ -8,6 +8,7 @@ export const playbook = sqliteTable('playbook', {
   fallbackBucketId: text('fallback_bucket_id'),
   efFloor: real('ef_floor').notNull().default(150000),
   isOnboarded: integer('is_onboarded', { mode: 'boolean' }).notNull().default(false),
+  lastChecklistMonth: text('last_checklist_month'), // format YYYY-MM
 })
 
 export const buckets = sqliteTable('buckets', {

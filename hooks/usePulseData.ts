@@ -1,6 +1,7 @@
 import { usePlaybookStore } from '@/store/playbook'
 import { useBucketsStore } from '@/store/buckets'
 import { useTransactionsStore } from '@/store/transactions'
+import { useGoalsStore } from '@/store/goals'
 import { getMonthRange, getDaysRemaining } from '@/lib/month'
 
 export function usePulseData() {
@@ -12,7 +13,9 @@ export function usePulseData() {
     getSpentByBucket,
     getConfirmedSavingsBuckets,
     addTransaction,
+    transactions,
   } = useTransactionsStore()
+  const { goals } = useGoalsStore()
 
   const spendingBuckets = getSpendingBuckets()
   const savingsBuckets = getSavingsBuckets()
@@ -39,6 +42,20 @@ export function usePulseData() {
   const weeksRemaining = Math.max(1, daysRemaining / 7)
   const weeklyRate = daysRemaining > 0 ? Math.max(0, available) / weeksRemaining : 0
 
+  // Net Worth calculations
+  const goalBalances = goals.map(g => {
+    const current = transactions
+      .filter(t => g.linkedBucketIds.includes(t.bucketId))
+      .reduce((sum, t) => sum + t.amount, 0)
+    return { name: g.name, value: g.startBalance + current }
+  })
+
+  const totalAssets = goalBalances.reduce((sum, g) => sum + g.value, 0)
+  const totalLiabilities = 0 // V1: manual liabilities not yet implemented in store
+  const netWorth = totalAssets - totalLiabilities
+  const monthGrowth = confirmedSavings // In V1, growth is driven by confirmed savings contributions
+  const savingsRate = totalIncome > 0 ? (confirmedSavings / totalIncome) * 100 : 0
+
   return {
     totalIncome,
     available,
@@ -54,5 +71,11 @@ export function usePulseData() {
     confirmedSavingIds,
     monthStart: start,
     addTransaction,
+    netWorth,
+    monthGrowth,
+    totalAssets,
+    totalLiabilities,
+    savingsRate,
+    assetBreakdown: goalBalances,
   }
 }

@@ -83,16 +83,14 @@
 
 ---
 
-## Phase 4 — Advanced Features 🚀
+## Phase 4 — Advanced Features (Completed ✅)
 
 ### Step 10: Month Start Checklist (PRD F10)
-- [ ] Modal/Banner on 1st of month
-- [ ] Confirm salary received, confirm fixed transfers (SIP, EF, etc.)
-- [ ] Auto-create recurring drafts (PRD F5)
+- [x] Modal/Banner on 1st of month
+- [x] Confirm salary received, confirm fixed transfers (SIP, EF, etc.)
+- [x] Auto-create recurring drafts (PRD F5)
 
 ### Step 11: OCR Scanner (F1)
-- [ ] `lib/ocr.ts` — `rn-mlkit-ocr` + Regex templates for eSewa, Khalti, major Banks
-- [ ] Validation checklist ("NPR", "Amount", "Success" keywords)
 - [ ] Pre-fill feedback loop into ManualEntrySheet
 
 ### Step 12: Notifications & Nudges (F9)
