@@ -18,7 +18,7 @@ export default function GoalsScreen() {
   const { goals } = useGoalsStore()
   const { transactions } = useTransactionsStore()
   const { buckets } = useBucketsStore()
-  const { efFloor, monthlyIncome } = usePlaybookStore()
+  const { efFloor } = usePlaybookStore()
 
   const [selectedGoal, setSelectedGoal] = useState<(Goal & { current: number; color: string }) | null>(null)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -76,7 +76,10 @@ export default function GoalsScreen() {
   // Summary calculations
   const totalSaved = goalsWithStatus.reduce((sum, g) => sum + g.current, 0)
   const totalMonthlyCommitment = goalsWithStatus.reduce((sum, g) => sum + g.monthlyContribution, 0)
-  const efCoverageMonths = monthlyIncome > 0 ? Math.floor(efFloor / monthlyIncome) : 0
+  // EF coverage = target / Core Living monthly (how many months of core expenses covered)
+  const coreLivingBucket = buckets.find(b => b.name === 'Core Living' && b.isActive)
+  const coreLivingMonthly = coreLivingBucket?.monthlyAmount ?? 0
+  const efCoverageMonths = coreLivingMonthly > 0 ? Math.floor(efFloor / coreLivingMonthly) : 0
 
   const handleEdit = (goal: Goal) => {
     // Can't edit the EF pseudo-goal (managed via Settings)

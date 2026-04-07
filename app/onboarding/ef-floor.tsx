@@ -5,11 +5,17 @@ import { Ionicons } from '@expo/vector-icons'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { colors } from '@/constants/colors'
 import { usePlaybookStore } from '@/store/playbook'
+import { useBucketsStore } from '@/store/buckets'
 import { formatNPR } from '@/lib/format'
+import { EF_MULTIPLIER } from '@/constants/defaults'
 
 export default function OnboardingEFFloorScreen() {
-  const { monthlyIncome, updatePlaybook } = usePlaybookStore()
-  const suggestedFloor = monthlyIncome * 4
+  const { updatePlaybook } = usePlaybookStore()
+  const { buckets } = useBucketsStore()
+
+  const coreLiving = buckets.find(b => b.name === 'Core Living' && b.isActive)
+  const coreLivingAmount = coreLiving?.monthlyAmount ?? 50000
+  const suggestedFloor = EF_MULTIPLIER * coreLivingAmount
 
   const [efFloor, setEfFloor] = useState(String(suggestedFloor))
 
@@ -31,7 +37,7 @@ export default function OnboardingEFFloorScreen() {
           </View>
           <Text style={styles.title}>Emergency Fund</Text>
           <Text style={styles.subtitle}>
-            Your safety net. Financial experts recommend 3-6 months of expenses. We suggest 4 months based on your income.
+            Your safety net. Financial experts recommend 3-6 months of core expenses. We suggest {EF_MULTIPLIER} months based on your Core Living spend.
           </Text>
         </Animated.View>
 
@@ -39,9 +45,9 @@ export default function OnboardingEFFloorScreen() {
           <View style={styles.suggestionCard}>
             <Ionicons name="sparkles" size={18} color={colors.green} />
             <Text style={styles.suggestionText}>
-              Based on your income of NPR {formatNPR(monthlyIncome)}, we suggest{' '}
+              Based on your Core Living spend of NPR {formatNPR(coreLivingAmount)}/mo, we suggest{' '}
               <Text style={styles.suggestionHighlight}>NPR {formatNPR(suggestedFloor)}</Text>{' '}
-              as your EF target.
+              ({EF_MULTIPLIER} months of core expenses) as your EF target.
             </Text>
           </View>
 

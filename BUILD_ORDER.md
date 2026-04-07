@@ -65,6 +65,7 @@
 ## Phase 3 — Goals & Vault (Completed ✅)
 
 ### Step 8: Vault / Goals screen
+> **Note:** EF target = 6 × Core Living, not income-based. See `EF_MULTIPLIER` in `constants/defaults.ts`.
 - [x] `app/(tabs)/goals.tsx` — Goal cards with circular progress rings
 - [x] Emergency Fund pseudo-goal derived from playbook efFloor, pinned at top
 - [x] `components/goals/AddGoalSheet.tsx` — Create/edit goals with bucket picker
@@ -140,3 +141,13 @@ Step 1 ──> Step 2 ──> Step 3 ──> Step 4 ──> Step 5
                                     v
                             Step 11 + Step 12
 ```
+
+---
+
+## Phase 6 — AI Layer (exploratory, no timeline)
+
+- [ ] `ai/insights.ts` — monthly data → plain English commentary
+- [ ] `ai/goals.ts` — goal + surplus → acceleration scenarios
+- [ ] `ai/ef.ts` — multi-month patterns → EF contribution nudge
+- Tap-triggered UI only. No chat. No text input.
+- Prerequisite: 3+ months of real transaction data

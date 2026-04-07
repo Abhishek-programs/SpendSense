@@ -20,9 +20,11 @@ export const DEFAULT_BUCKETS: DefaultBucket[] = [
 ]
 
 export const EF_BUCKET_ID = 'ef'
+export const EF_MULTIPLIER = 6 // EF target = multiplier × Core Living monthly amount
 
 export const DEFAULT_INCOME = 125000
-export const DEFAULT_EF_FLOOR = 150000
+// 6 × Core Living (50,000) = 3,00,000
+export const DEFAULT_EF_FLOOR = EF_MULTIPLIER * 50000
 export const DEFAULT_MONTH_START_DAY = 1
 
 export const DEFAULT_KEYWORD_MAPPINGS = [

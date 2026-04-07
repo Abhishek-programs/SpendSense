@@ -140,6 +140,10 @@ Month start day is user-set (default: 1). All "this month" queries use this. Sto
 
 Monthly only in V1. Auto-create draft on month_start_day. Draft shown on Home as pending item. Must be confirmed within 3 days or nudge fires. Drafts do NOT count toward totals until confirmed.
 
+### Emergency Fund Target
+
+Emergency Fund target = `EF_MULTIPLIER` (default 6) × Core Living monthly amount. Never derived from income. Recalculates if Core Living bucket amount is edited in Settings.
+
 ### Floors
 
 Stored in playbook. Warn when EF balance approaches floor. Never block.
@@ -295,3 +299,19 @@ export function projectGoalCompletion(opts: {
 - Only comment non-obvious business logic (e.g. the categorization priority order).
 - Don't refactor adjacent code unless it directly blocks the task.
 - Don't add features, fallbacks, or validation beyond what the screen spec requires.
+
+---
+
+## Future AI Layer (not in V1, not in any planned version — exploratory only)
+
+If AI is ever added, it lives in `ai/` and is purely additive.
+It never touches `lib/`, `store/`, or `db/` directly.
+All math stays in pure functions. AI only narrates or suggests.
+
+Potential surfaces (tap-triggered, no chat):
+- Monthly insights card — spend commentary from real data
+- Goal acceleration — surplus-based scenarios via `projection.ts`
+- EF intelligence — multi-month surplus patterns → contribution nudge
+
+Do not build until 3+ months of real data exists.
+App is fully functional and complete without this layer.
