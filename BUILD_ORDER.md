@@ -101,7 +101,10 @@
 ### Step 10: Month Start Checklist (PRD F10)
 - [x] Modal/Banner on start of month. but show them if not ticked off before.
 - [x] Confirm salary received, confirm fixed transfers (SIP, EF, etc.)
-- [ ] User could come to the page when ever, if they have not filled for that month, show. And when they tick off, update the last_checklist_month in playbook. And add relevant transaction
+- [x] Each tick immediately logs the correct transaction type (income vs savings confirm)
+- [x] Persistent tick state derived from actual transactions in DB
+- [x] "Month checklist pending" banner when dismissed without completing
+- [x] Auto-marks lastChecklistMonth when all items completed
 - [ ] Auto-create recurring drafts (PRD F5)
 
 ### Step 5.1-5.4: Home Polish
