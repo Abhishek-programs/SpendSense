@@ -50,15 +50,17 @@
 - [x] `app/(tabs)/transactions.tsx` — List grouped by date, Filter chips, Summary row
 - [x] `components/transactions/TransactionRow.tsx` — bucket pill, merchant, amount
 - [x] `components/transactions/TransactionDetailSheet.tsx` — reassign bucket, delete
-- [ ] Make sure if the section like spending by bucket has no content then have a info or placeholder informing what is meant to be here and when it will show
-- [ ] **[TODO]** `ChartsView.tsx` — Donut breakdown, 6-Month Trend, Milestone markers
-- [ ] **[TODO]** Annual View toggle (PRD F11)
+- [x] `ChartsView.tsx` — Horizontal bar chart with green/amber/red thresholds, 6-month trend, annual view
+- [x] Annual View toggle wired to period prop
+- [x] Empty states for no data and insufficient history
 
 ### Step 7: Flagged transaction prompt (PRD F4 / Flow 9)
-- [ ] `app/(tabs)/index.tsx` — Amber banner shown when `transactions.filter(t => t.isFlagged)` is not empty
-- [ ] `components/flagged/FlaggedTransactionPrompt.tsx` — Bottom sheet identifying "Needs Review" items
-- [ ] Sequential walkthrough of flagged items (1 of N)
-- [ ] Assignment clears flag bit in DB
+- [x] `app/(tabs)/index.tsx` — Amber banner shown when `transactions.filter(t => t.isFlagged)` is not empty
+- [x] `components/flagged/FlaggedTransactionPrompt.tsx` — Bottom sheet identifying "Needs Review" items
+- [x] Sequential walkthrough of flagged items (1 of N)
+- [x] Assignment clears flag bit in DB
+- [x] "Always use this bucket for [merchant]" adds to sure_shot_merchants
+- [x] Banner disappears when all flags cleared, HeroRing updates reactively
 
 ---
 
@@ -99,7 +101,10 @@
 ### Step 10: Month Start Checklist (PRD F10)
 - [x] Modal/Banner on start of month. but show them if not ticked off before.
 - [x] Confirm salary received, confirm fixed transfers (SIP, EF, etc.)
-- [ ] User could come to the page when ever, if they have not filled for that month, show. And when they tick off, update the last_checklist_month in playbook. And add relevant transaction
+- [x] Each tick immediately logs the correct transaction type (income vs savings confirm)
+- [x] Persistent tick state derived from actual transactions in DB
+- [x] "Month checklist pending" banner when dismissed without completing
+- [x] Auto-marks lastChecklistMonth when all items completed
 - [ ] Auto-create recurring drafts (PRD F5)
 
 ### Step 5.1-5.4: Home Polish
@@ -112,15 +117,55 @@
 
 ## Remaining Work
 
-### Step 11: OCR Scanner (F1)
-- [ ] `lib/ocr.ts` — `rn-mlkit-ocr` + Regex templates for eSewa, Khalti, major Banks
-- [ ] Validation checklist ("NPR", "Amount", "Success" keywords)
-- [ ] Pre-fill feedback loop into ManualEntrySheet
+### Step 11: OCR Scanner — V1 (image picker flow)
+- [ ] `lib/ocr.ts` — add `parseOcrText()` with regex for eSewa, Khalti, NMB, Global IME
+- [ ] Validation: confirm NPR amount matched before pre-filling form
+- [ ] Pre-fill `ManualEntrySheet` from parsed fields (amount, merchant)
+- [ ] Wire `expo-image-picker` → OCR → pre-fill → user confirms
 
 ### Step 12: Notifications & Nudges (F9)
-- [ ] `expo-notifications` 1-per-day limit logic
-- [ ] Quiet hours (10pm - 8am)
-- [ ] Nudge triggers: 80% ceiling, investment pending, EF milestone
+- [x] `expo-notifications` plugin added to `app.json`, Android channel setup
+- [x] `lib/notifications.ts` — 1-per-day cap, quiet hours (10pm–8am), priority scheduling
+- [x] Nudge triggers: 80%/100% budget, savings unconfirmed 3d, EF milestones, flagged 3d+
+- [x] Permission request on first open after onboarding
+- [x] Settings toggles wired to playbook store
+- [x] `checkAndScheduleAll()` called on app open from `_layout.tsx`
+
+---
+
+## V2 — Bubble Overlay (separate effort, Android only)
+
+> Full architecture + LLM-ready implementation prompt: `reference/OVERLAY_LLM_PROMPT.md`
+
+### Phase 1: Bubble infrastructure (no OCR)
+- [ ] `android/.../overlay/OverlayService.kt` — Foreground service + WindowManager
+- [ ] `android/.../overlay/FloatingBubbleView.kt` — Draggable green bubble
+- [ ] `android/.../overlay/OverlayModule.kt` + `OverlayPackage.kt` — RN bridge
+- [ ] `AndroidManifest.xml` — FOREGROUND_SERVICE + media_projection service declaration
+- [ ] `MainApplication.kt` — register OverlayPackage
+- [ ] `lib/overlay.ts` — JS wrapper
+- [ ] Settings toggle (start/stop bubble)
+- [ ] **Done when:** bubble appears over banking app, drags, dismisses ✅
+
+### Phase 2: Screen capture
+- [ ] `android/.../overlay/ScreenCaptureManager.kt` — MediaProjection → Bitmap
+- [ ] `OverlayModule.requestMediaProjectionPermission()` — one-time permission dialog
+- [ ] Wire tap → capture → debug toast with bitmap dimensions
+- [ ] **Done when:** tap bubble → toast shows "Captured 1080×2340" ✅
+
+### Phase 3: OCR pipeline
+- [ ] `android/.../overlay/MLKitOCRProcessor.kt` — ML Kit on captured bitmap
+- [ ] `android/.../overlay/OcrResultBridge.kt` — emits `onOcrResult` to JS
+- [ ] `hooks/useOverlay.ts` — receive event, log raw text
+- [ ] Add ML Kit gradle dep (`com.google.mlkit:text-recognition:16.0.1`)
+- [ ] **Done when:** tap over eSewa → toast shows extracted text ✅
+
+### Phase 4: Categorize + save
+- [ ] Extend `lib/ocr.ts` with `parseOcrText()` (amount/merchant regex)
+- [ ] Complete `hooks/useOverlay.ts` — categorize → addTransaction → toast
+- [ ] Add `useOverlay()` to `app/_layout.tsx`
+- [ ] Add `'overlay'` to transaction source union + migration if needed
+- [ ] **Done when:** silent end-to-end flow, transaction in Ledger ✅
 
 ---
 
