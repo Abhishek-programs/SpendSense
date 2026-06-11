@@ -13,7 +13,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatNPRShort } from '@/lib/format'
 import { useGoalsStore, type Goal } from '@/store/goals'
+import { useBucketsStore } from '@/store/buckets'
 import { projectGoal } from '@/lib/projection'
+import { GOAL_BUCKET_LABELS } from '@/lib/goals/plan'
 import { PieChart } from 'react-native-gifted-charts'
 
 interface GoalDetailSheetProps {
@@ -25,8 +27,11 @@ interface GoalDetailSheetProps {
 
 export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSheetProps) {
   const { deleteGoal } = useGoalsStore()
+  const { buckets } = useBucketsStore()
 
   if (!goal) return null
+
+  const linkedBuckets = buckets.filter(b => goal.linkedBucketIds.includes(b.id))
 
   const handleDelete = () => {
     Alert.alert(
@@ -131,26 +136,31 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
             )}
           </View>
 
-          {/* Allocation */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Asset Allocation</Text>
-            <View style={styles.allocationRow}>
-              <View style={styles.allocationBarContainer}>
-                <View style={[styles.allocationBar, { width: '60%', backgroundColor: goal.color }]} />
-                <View style={[styles.allocationBar, { width: '40%', backgroundColor: goal.color + '44' }]} />
-              </View>
-              <View style={styles.allocationLegend}>
-                <View style={styles.legendEntry}>
-                  <View style={[styles.legendDot, { backgroundColor: goal.color }]} />
-                  <Text style={styles.legendText}>Equity (60%)</Text>
-                </View>
-                <View style={styles.legendEntry}>
-                  <View style={[styles.legendDot, { backgroundColor: goal.color + '44' }]} />
-                  <Text style={styles.legendText}>Debt (40%)</Text>
-                </View>
-              </View>
+          {goal.paymentMode === 'upfront_emi' && linkedBuckets.length > 1 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Monthly split</Text>
+              {linkedBuckets.map(b => {
+                const role = b.goalBucketRole
+                const title = role ? GOAL_BUCKET_LABELS[role].title : b.name
+                const hint = role ? GOAL_BUCKET_LABELS[role].hint : undefined
+                return (
+                  <View key={b.id} style={styles.splitRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.splitTitle}>{title}</Text>
+                      {hint && <Text style={styles.splitHint}>{hint}</Text>}
+                    </View>
+                    <Text style={styles.splitAmount}>NPR {formatNPRShort(b.monthlyAmount)}/mo</Text>
+                  </View>
+                )
+              })}
             </View>
-          </View>
+          )}
+
+          {!goal.isEnabled && (
+            <View style={styles.pausedBanner}>
+              <Text style={styles.pausedText}>This goal is paused — re-enable in Settings or Bucket Builder</Text>
+            </View>
+          )}
 
           {/* Delete */}
           <View style={styles.section}>
@@ -305,37 +315,42 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  allocationRow: {
-    gap: 16,
-  },
-  allocationBarContainer: {
-    height: 12,
-    backgroundColor: colors.divider,
-    borderRadius: 6,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  allocationBar: {
-    height: '100%',
-  },
-  allocationLegend: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  legendEntry: {
+  splitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
   },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  splitTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
   },
-  legendText: {
+  splitHint: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: colors.textSecond,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  splitAmount: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  pausedBanner: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    padding: 12,
+    backgroundColor: colors.border + '40',
+    borderRadius: 10,
+  },
+  pausedText: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   deleteButton: {
     flexDirection: 'row',

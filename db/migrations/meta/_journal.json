@@ -29,6 +29,27 @@
       "when": 1775587843289,
       "tag": "0003_calm_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1775587843289,
+      "tag": "0004_food_bucket_ef_balance",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1775687843289,
+      "tag": "0005_goal_payment_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1775787843289,
+      "tag": "0006_personal_bucket_balances",
+      "breakpoints": true
     }
   ]
 }

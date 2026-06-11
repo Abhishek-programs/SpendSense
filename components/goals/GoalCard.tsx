@@ -10,10 +10,11 @@ interface GoalCardProps {
   target: number
   monthly: number
   color: string
+  paused?: boolean
   onPress: () => void
 }
 
-export function GoalCard({ name, current, target, monthly, color, onPress }: GoalCardProps) {
+export function GoalCard({ name, current, target, monthly, color, paused, onPress }: GoalCardProps) {
   const percent = Math.min((current / target) * 100, 100)
   const { projectedDate, nudge } = projectGoal({ current, target, monthly })
 
@@ -24,7 +25,7 @@ export function GoalCard({ name, current, target, monthly, color, onPress }: Goa
 
   return (
     <TouchableOpacity 
-      style={styles.container} 
+      style={[styles.container, paused && styles.containerPaused]} 
       activeOpacity={0.8}
       onPress={onPress}
     >
@@ -44,8 +45,15 @@ export function GoalCard({ name, current, target, monthly, color, onPress }: Goa
 
         <View style={styles.info}>
           <View style={styles.header}>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.date}>{projectedDate}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <Text style={[styles.name, paused && styles.namePaused]}>{name}</Text>
+              {paused && (
+                <View style={styles.pausedBadge}>
+                  <Text style={styles.pausedBadgeText}>Paused</Text>
+                </View>
+              )}
+            </View>
+            {!paused && <Text style={styles.date}>{projectedDate}</Text>}
           </View>
           
           <View style={styles.meta}>
@@ -85,6 +93,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
+  containerPaused: {
+    opacity: 0.65,
+  },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -114,6 +125,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
+  },
+  namePaused: {
+    color: colors.textMuted,
+  },
+  pausedBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pausedBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
   },
   date: {
     fontSize: 12,

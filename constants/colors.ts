@@ -5,6 +5,8 @@ export const colors = {
   divider: '#F0F2F5',
   green: '#16A34A',
   greenFill: '#DCFCE7',
+  savingsSetAside: '#14B8A6',
+  savingsSetAsideLight: '#86EFAC',
   amber: '#F59E0B',
   amberFill: '#FEF3C7',
   red: '#DC2626',

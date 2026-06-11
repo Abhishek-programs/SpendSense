@@ -3,6 +3,12 @@ import { and, eq, gte, lte } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { transactions } from '@/db/schema'
 import { getMonthRange } from '@/lib/month'
+import {
+  deductFromAccumulatingBucket,
+  isAccumulatingExpense,
+  restoreToAccumulatingBucket,
+} from '@/lib/bucket-balance'
+import { useBucketsStore } from '@/store/buckets'
 
 export const INCOME_BUCKET_ID = '_income'
 
@@ -13,7 +19,7 @@ export interface Transaction {
   merchant: string | null
   bucketId: string
   date: string
-  source: 'manual' | 'ocr'
+  source: 'manual' | 'ocr' | 'overlay'
   remarks: string | null
   parsedTxnId: string | null
   isFlagged: boolean
@@ -26,7 +32,7 @@ interface TransactionsState {
   flaggedTransactions: Transaction[]
   isLoaded: boolean
   loadTransactions: (monthStart: Date, monthEnd: Date) => Promise<void>
-  addTransaction: (txn: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>
+  addTransaction: (txn: Omit<Transaction, 'id' | 'createdAt'>) => Promise<{ overspent?: number }>
   updateTransaction: (id: string, patch: Partial<Transaction>) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
   getSpentByBucket: (bucketId: string) => number
@@ -65,14 +71,29 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     const now = new Date().toISOString()
     const row = { ...txn, id, createdAt: now }
     await db.insert(transactions).values(row)
-    // Reload current month's transactions
+
+    let overspent: number | undefined
+    const bucket = useBucketsStore.getState().buckets.find(b => b.id === txn.bucketId)
+    if (
+      bucket?.accumulates &&
+      txn.type === 'expense' &&
+      isAccumulatingExpense(txn.remarks)
+    ) {
+      const result = await deductFromAccumulatingBucket(bucket.id, txn.amount)
+      await useBucketsStore.getState().refreshBalances()
+      if (result.overspent > 0) {
+        overspent = result.overspent
+      }
+    }
+
     const state = get()
     if (state.transactions.length > 0 || state.isLoaded) {
-      // Re-derive month range from the transaction's date context
       const allTxns = [...state.transactions, row]
       const flagged = allTxns.filter(t => t.isFlagged)
       set({ transactions: allTxns, flaggedTransactions: flagged })
     }
+
+    return { overspent }
   },
 
   updateTransaction: async (id, patch) => {
@@ -97,7 +118,24 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
   },
 
   deleteTransaction: async (id) => {
+    const txn = get().transactions.find(t => t.id === id)
     await db.delete(transactions).where(eq(transactions.id, id))
+
+    if (txn) {
+      const bucket = useBucketsStore.getState().buckets.find(b => b.id === txn.bucketId)
+      if (
+        bucket?.accumulates &&
+        txn.type === 'expense' &&
+        isAccumulatingExpense(txn.remarks)
+      ) {
+        await restoreToAccumulatingBucket(
+          bucket.id,
+          txn.amount,
+          bucket.accumulationCap,
+        )
+        await useBucketsStore.getState().refreshBalances()
+      }
+    }
 
     const state = get()
     const remaining = state.transactions.filter(t => t.id !== id)
@@ -106,6 +144,8 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
   },
 
   getSpentByBucket: (bucketId: string) => {
+    const bucket = useBucketsStore.getState().buckets.find(b => b.id === bucketId)
+    if (bucket?.accumulates) return 0
     return get()
       .transactions.filter(t => t.bucketId === bucketId && !t.isFlagged && !t.isRecurringDraft && t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0)

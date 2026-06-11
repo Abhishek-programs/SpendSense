@@ -7,8 +7,10 @@ export const playbook = sqliteTable('playbook', {
   monthStartDay: integer('month_start_day').notNull().default(1),
   fallbackBucketId: text('fallback_bucket_id'),
   efFloor: real('ef_floor').notNull().default(150000),
+  efStartBalance: real('ef_start_balance').notNull().default(0),
   isOnboarded: integer('is_onboarded', { mode: 'boolean' }).notNull().default(false),
   lastChecklistMonth: text('last_checklist_month'), // format YYYY-MM
+  lastBalanceRolloverMonth: text('last_balance_rollover_month'), // format YYYY-MM
 })
 
 export const buckets = sqliteTable('buckets', {
@@ -21,6 +23,17 @@ export const buckets = sqliteTable('buckets', {
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   showOnHome: integer('show_on_home', { mode: 'boolean' }).notNull().default(true),
+  linkedGoalId: text('linked_goal_id'),
+  goalBucketRole: text('goal_bucket_role', { enum: ['full', 'upfront', 'emi_reserve'] }),
+  accumulates: integer('accumulates', { mode: 'boolean' }).notNull().default(false),
+  accumulationCap: real('accumulation_cap'),
+})
+
+export const bucketBalances = sqliteTable('bucket_balances', {
+  id: text('id').primaryKey(),
+  bucketId: text('bucket_id').notNull(),
+  balance: real('balance').notNull().default(0),
+  updatedAt: text('updated_at').notNull(),
 })
 
 export const keywordMappings = sqliteTable('keyword_mappings', {
@@ -42,7 +55,7 @@ export const transactions = sqliteTable('transactions', {
   merchant: text('merchant'),
   bucketId: text('bucket_id').notNull(),
   date: text('date').notNull(), // ISO string
-  source: text('source', { enum: ['manual', 'ocr'] }).notNull().default('manual'),
+  source: text('source', { enum: ['manual', 'ocr', 'overlay'] }).notNull().default('manual'),
   remarks: text('remarks'),
   parsedTxnId: text('parsed_txn_id'),
   isFlagged: integer('is_flagged', { mode: 'boolean' }).notNull().default(false),
@@ -58,6 +71,10 @@ export const goals = sqliteTable('goals', {
   targetDate: text('target_date'),
   linkedBucketIds: text('linked_bucket_ids').notNull().default('[]'), // JSON array
   startBalance: real('start_balance').notNull().default(0),
+  paymentMode: text('payment_mode', { enum: ['pay_in_full', 'upfront_emi'] }).notNull().default('pay_in_full'),
+  upfrontAmount: real('upfront_amount'),
+  emiTenureMonths: integer('emi_tenure_months'),
+  isEnabled: integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull(),
 })
 

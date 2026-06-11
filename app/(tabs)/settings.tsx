@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   Switch,
+  Platform,
   Alert,
   StyleSheet,
   Pressable,
@@ -22,16 +23,19 @@ import { useGoalsStore } from '@/store/goals'
 import { formatNPR } from '@/lib/format'
 import { getMonthRange } from '@/lib/month'
 import { EF_BUCKET_ID } from '@/constants/defaults'
-import { db } from '@/db/client'
+import { db, applySchemaPatches } from '@/db/client'
 import {
   transactions,
   netWorthSnapshots,
   buckets as bucketsTable,
   keywordMappings as keywordMappingsTable,
   sureShotMerchants as sureShotMerchantsTable,
+  bucketBalances as bucketBalancesTable,
   playbook,
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
+import { injectMockData, getDevMockDataPayload } from '@/lib/dev/mock-data'
+import { Overlay, isOverlayAvailable } from '@/lib/overlay'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
 
@@ -252,7 +256,13 @@ export default function SettingsScreen() {
 
   // Bucket inline editor state
   const [expandedBucketId, setExpandedBucketId] = useState<string | null>(null)
-  const [bucketDraft, setBucketDraft] = useState({ name: '', monthlyAmount: '', type: 'spending' as Bucket['type'], showOnHome: true })
+  const [bucketDraft, setBucketDraft] = useState({
+    name: '',
+    monthlyAmount: '',
+    accumulationCap: '',
+    type: 'spending' as Bucket['type'],
+    showOnHome: true,
+  })
 
   // Add bucket state
   const [addingBucket, setAddingBucket] = useState(false)
@@ -270,6 +280,14 @@ export default function SettingsScreen() {
 
   // Notification toggles — synced to playbook store
   const [nudges, setNudges] = useState(pb.nudgeToggles)
+  const [injecting, setInjecting] = useState(false)
+  const [overlayPerm, setOverlayPerm] = useState(false)
+  const [bubbleEnabled, setBubbleEnabled] = useState(false)
+
+  useEffect(() => {
+    if (!isOverlayAvailable()) return
+    Overlay.isPermissionGranted().then(setOverlayPerm)
+  }, [])
 
   const expandBucket = (b: Bucket) => {
     if (expandedBucketId === b.id) {
@@ -277,18 +295,32 @@ export default function SettingsScreen() {
       return
     }
     setExpandedBucketId(b.id)
-    setBucketDraft({ name: b.name, monthlyAmount: String(b.monthlyAmount), type: b.type, showOnHome: b.showOnHome })
+    setBucketDraft({
+      name: b.name,
+      monthlyAmount: String(b.monthlyAmount),
+      accumulationCap: b.accumulationCap != null ? String(b.accumulationCap) : '',
+      type: b.type,
+      showOnHome: b.showOnHome,
+    })
   }
 
   const saveBucketEdit = async (id: string) => {
     const amt = parseInt(bucketDraft.monthlyAmount, 10)
     if (!bucketDraft.name.trim() || isNaN(amt) || amt < 0) return
-    await bs.updateBucket(id, { 
-      name: bucketDraft.name.trim(), 
-      monthlyAmount: amt, 
+    const bucket = bs.buckets.find(x => x.id === id)
+    const patch: Partial<Bucket> = {
+      name: bucketDraft.name.trim(),
+      monthlyAmount: amt,
       type: bucketDraft.type,
-      showOnHome: bucketDraft.showOnHome 
-    })
+      showOnHome: bucketDraft.showOnHome,
+    }
+    if (bucket?.accumulates) {
+      const cap = parseInt(bucketDraft.accumulationCap, 10)
+      if (!isNaN(cap) && cap > 0) {
+        patch.accumulationCap = cap
+      }
+    }
+    await bs.updateBucket(id, patch)
     setExpandedBucketId(null)
   }
 
@@ -345,6 +377,38 @@ export default function SettingsScreen() {
     Alert.alert('CSV Export', `${rows.length} transactions exported.\n\n${csv.slice(0, 500)}${csv.length > 500 ? '...' : ''}`)
   }
 
+  const handleToggleBubble = async (enabled: boolean) => {
+    if (!isOverlayAvailable()) {
+      Alert.alert('Not available', 'Bubble overlay requires a dev client build with native overlay module.')
+      return
+    }
+    try {
+      if (enabled) {
+        await Overlay.start()
+        setBubbleEnabled(true)
+      } else {
+        await Overlay.stop()
+        setBubbleEnabled(false)
+      }
+    } catch (e: any) {
+      Alert.alert('Overlay error', e?.message ?? 'Could not toggle bubble')
+      setBubbleEnabled(false)
+    }
+  }
+
+  const handleInjectMockData = async () => {
+    setInjecting(true)
+    try {
+      const payload = getDevMockDataPayload()
+      const count = await injectMockData(payload)
+      Alert.alert('Injected', `${count} transactions added from lib/dev/mock-data.json.`)
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not inject mock data')
+    } finally {
+      setInjecting(false)
+    }
+  }
+
   const handleClearAllData = () => {
     Alert.alert(
       'Clear All Data',
@@ -355,19 +419,25 @@ export default function SettingsScreen() {
           text: 'Delete Everything',
           style: 'destructive',
           onPress: async () => {
-            await db.delete(transactions)
-            await db.delete(netWorthSnapshots)
-            await db.delete(keywordMappingsTable)
-            await db.delete(sureShotMerchantsTable)
-            await db.delete(bucketsTable)
-            await db.delete(playbook)
-            await seedDefaults()
-            await pb.loadPlaybook()
-            await bs.loadBuckets()
-            const { start, end } = getMonthRange(pb.monthStartDay)
-            await txnStore.loadTransactions(start, end)
-            await goalsStore.loadGoals()
-            Alert.alert('Done', 'All data cleared and defaults restored.')
+            try {
+              await db.delete(transactions)
+              await db.delete(bucketBalancesTable)
+              await db.delete(netWorthSnapshots)
+              await db.delete(keywordMappingsTable)
+              await db.delete(sureShotMerchantsTable)
+              await db.delete(bucketsTable)
+              await db.delete(playbook)
+              applySchemaPatches()
+              await seedDefaults()
+              await pb.loadPlaybook()
+              await bs.loadBuckets()
+              const { start, end } = getMonthRange(pb.monthStartDay)
+              await txnStore.loadTransactions(start, end)
+              await goalsStore.loadGoals()
+              Alert.alert('Done', 'All data cleared and defaults restored.')
+            } catch (e) {
+              Alert.alert('Error', e instanceof Error ? e.message : 'Could not clear data')
+            }
           },
         },
       ],
@@ -443,7 +513,11 @@ export default function SettingsScreen() {
                       <Text style={styles.bucketName}>{b.name}</Text>
                       {!b.showOnHome && <Ionicons name="eye-off" size={14} color={colors.textMuted} />}
                     </View>
-                    <Text style={styles.bucketAmount}>NPR {formatNPR(b.monthlyAmount)}/mo</Text>
+                    <Text style={styles.bucketAmount}>
+                      {b.accumulates
+                        ? `Fund: NPR ${formatNPR(bs.getBucketBalance(b.id))} · +${formatNPR(b.monthlyAmount)}/mo`
+                        : `NPR ${formatNPR(b.monthlyAmount)}/mo`}
+                    </Text>
                   </View>
                   <TypeBadge type={b.type} />
                 </TouchableOpacity>
@@ -466,9 +540,27 @@ export default function SettingsScreen() {
                     value={bucketDraft.monthlyAmount}
                     onChangeText={v => setBucketDraft(d => ({ ...d, monthlyAmount: v }))}
                     keyboardType="numeric"
-                    placeholder="Monthly amount"
+                    placeholder={b.accumulates ? 'Monthly top-up' : 'Monthly amount'}
                     placeholderTextColor={colors.textMuted}
                   />
+                  {b.accumulates && (
+                    <>
+                      <Text style={[styles.fieldHint, { marginTop: 8 }]}>
+                        Current balance: NPR {formatNPR(bs.getBucketBalance(b.id))}
+                      </Text>
+                      <TextInput
+                        style={[styles.input, { marginTop: 8 }]}
+                        value={bucketDraft.accumulationCap}
+                        onChangeText={v => setBucketDraft(d => ({ ...d, accumulationCap: v }))}
+                        keyboardType="numeric"
+                        placeholder="Max balance cap"
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      <Text style={styles.fieldHint}>
+                        Disabling stops top-ups; balance is kept.
+                      </Text>
+                    </>
+                  )}
                   <View style={styles.typeRow}>
                     {BUCKET_TYPES.map(t => (
                       <Pressable
@@ -533,7 +625,11 @@ export default function SettingsScreen() {
                       <Text style={styles.bucketName}>{b.name}</Text>
                       {!b.showOnHome && <Ionicons name="eye-off" size={14} color={colors.textMuted} />}
                     </View>
-                    <Text style={styles.bucketAmount}>NPR {formatNPR(b.monthlyAmount)}/mo</Text>
+                    <Text style={styles.bucketAmount}>
+                      {b.accumulates
+                        ? `Fund: NPR ${formatNPR(bs.getBucketBalance(b.id))} · +${formatNPR(b.monthlyAmount)}/mo`
+                        : `NPR ${formatNPR(b.monthlyAmount)}/mo`}
+                    </Text>
                   </View>
                   <TypeBadge type={b.type} />
                 </TouchableOpacity>
@@ -816,7 +912,65 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Card>
 
+        {Platform.OS === 'android' && (
+          <>
+            <SectionHeader title="Scan Bubble" description="Capture transactions over banking apps (Android)" />
+            <Card>
+              <TouchableOpacity
+                style={styles.permissionRow}
+                onPress={() => Overlay.requestPermission()}
+              >
+                <Text style={styles.permissionLabel}>Draw over other apps</Text>
+                <Ionicons
+                  name={overlayPerm ? 'checkmark-circle' : 'close-circle'}
+                  size={22}
+                  color={overlayPerm ? colors.green : colors.red}
+                />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.permissionRow}
+                onPress={() => Overlay.requestMediaProjection()}
+              >
+                <Text style={styles.permissionLabel}>Screen capture access</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <View style={styles.permissionRow}>
+                <Text style={styles.permissionLabel}>Enable bubble</Text>
+                <Switch
+                  value={bubbleEnabled}
+                  onValueChange={handleToggleBubble}
+                  disabled={!overlayPerm}
+                  trackColor={{ false: colors.border, true: colors.greenFill }}
+                  thumbColor={bubbleEnabled ? colors.green : '#f4f3f4'}
+                />
+              </View>
+            </Card>
+          </>
+        )}
+
         {/* Section 7: Developer */}
+        {__DEV__ && (
+          <>
+            <SectionHeader title="Dev Tools" description="Edit lib/dev/mock-data.json, then inject" />
+            <Card>
+              <Text style={styles.sectionDesc}>
+                Loads mock months from lib/dev/mock-data.json in the repo.
+              </Text>
+              <TouchableOpacity
+                onPress={handleInjectMockData}
+                style={[styles.actionButton, { marginTop: 12 }]}
+                disabled={injecting}
+              >
+                <Text style={styles.actionButtonText}>
+                  {injecting ? 'Injecting…' : 'Inject Mock Data'}
+                </Text>
+              </TouchableOpacity>
+            </Card>
+          </>
+        )}
+
         <SectionHeader title="Developer" description="Danger zone" />
         <Card>
           <TouchableOpacity onPress={handleClearAllData} style={[styles.actionButton, { borderColor: colors.red }]}>
@@ -884,6 +1038,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     textAlign: 'center',
+  },
+  fieldHint: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    lineHeight: 16,
   },
   divider: {
     height: 1,
@@ -1051,5 +1211,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
     color: colors.green,
+  },
+  permissionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  permissionLabel: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textPrimary,
   },
 })

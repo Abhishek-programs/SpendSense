@@ -1,7 +1,20 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatDate } from '@/lib/format'
+import { detectSourceApp } from '@/lib/ocr'
+import { sourceAppLabel } from '@/lib/ocr-templates'
 import type { Transaction } from '@/store/transactions'
+
+function sourceBadgeLabel(transaction: Transaction): string | null {
+  if (transaction.source === 'manual') return null
+
+  const hint = [transaction.merchant, transaction.remarks].filter(Boolean).join(' ')
+  const appLabel = hint ? sourceAppLabel(detectSourceApp(hint)) : null
+
+  if (transaction.source === 'overlay') return appLabel ?? 'Bubble'
+  if (transaction.source === 'ocr') return appLabel ?? 'OCR'
+  return null
+}
 
 interface TransactionRowProps {
   transaction: Transaction
@@ -12,6 +25,7 @@ interface TransactionRowProps {
 
 export function TransactionRow({ transaction, bucketName, bucketColor, onPress }: TransactionRowProps) {
   const isIncome = transaction.type === 'income'
+  const badgeLabel = sourceBadgeLabel(transaction)
 
   return (
     <TouchableOpacity
@@ -32,9 +46,14 @@ export function TransactionRow({ transaction, bucketName, bucketColor, onPress }
             {bucketName}
           </Text>
         </View>
-        {transaction.source === 'ocr' && (
-          <View style={styles.ocrBadge}>
-            <Text style={styles.ocrBadgeText}>OCR</Text>
+        {badgeLabel && (
+          <View
+            style={[
+              styles.sourceBadge,
+              transaction.source === 'overlay' && styles.overlayBadge,
+            ]}
+          >
+            <Text style={styles.sourceBadgeText}>{badgeLabel}</Text>
           </View>
         )}
       </View>
@@ -91,13 +110,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
   },
-  ocrBadge: {
+  sourceBadge: {
     backgroundColor: colors.divider,
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  ocrBadgeText: {
+  overlayBadge: {
+    backgroundColor: colors.greenFill,
+  },
+  sourceBadgeText: {
     fontSize: 9,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textMuted,

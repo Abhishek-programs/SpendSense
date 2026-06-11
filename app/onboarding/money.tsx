@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { colors } from '@/constants/colors'
 import { usePlaybookStore } from '@/store/playbook'
+import { OnboardingBack } from '@/components/onboarding/OnboardingBack'
 
 export default function OnboardingMoneyScreen() {
   const [income, setIncome] = useState('125000')
@@ -19,7 +20,7 @@ export default function OnboardingMoneyScreen() {
       monthlyIncome: incValue,
       monthStartDay: Math.max(1, Math.min(31, dayValue))
     })
-    router.push('/onboarding/buckets')
+    router.push('/onboarding/foundations')
   }
 
   return (
@@ -28,6 +29,7 @@ export default function OnboardingMoneyScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <OnboardingBack />
         <Animated.View entering={FadeInDown.duration(800).delay(200)}>
           <View style={styles.iconContainer}>
             <Ionicons name="wallet" size={32} color={colors.green} />
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 32,
-    paddingTop: 100,
+    paddingTop: 48,
     paddingBottom: 60,
   },
   iconContainer: {

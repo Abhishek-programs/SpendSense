@@ -11,6 +11,7 @@ interface NetWorthCardProps {
   liabilities: number
   savingsRate: number
   breakdown?: { label: string; value: number }[]
+  emptyHint?: string
 }
 
 export function NetWorthCard({ 
@@ -19,7 +20,8 @@ export function NetWorthCard({
   assets, 
   liabilities, 
   savingsRate,
-  breakdown = []
+  breakdown = [],
+  emptyHint,
 }: NetWorthCardProps) {
   const [expanded, setExpanded] = useState(false)
 
@@ -38,9 +40,13 @@ export function NetWorthCard({
         <View style={styles.mainInfo}>
           <Text style={styles.label}>Net worth</Text>
           <Text style={styles.value}>{formatNPRShort(netWorth)}</Text>
-          <Text style={[styles.growth, monthGrowth >= 0 ? { color: colors.green } : { color: colors.red }]}>
-            {monthGrowth >= 0 ? '+' : ''}{formatNPRShort(monthGrowth)} this month
-          </Text>
+          {emptyHint && netWorth === 0 && breakdown.length === 0 ? (
+            <Text style={styles.emptyHint}>{emptyHint}</Text>
+          ) : (
+            <Text style={[styles.growth, monthGrowth >= 0 ? { color: colors.green } : { color: colors.red }]}>
+              {monthGrowth >= 0 ? '+' : ''}{formatNPRShort(monthGrowth)} this month
+            </Text>
+          )}
         </View>
         <Ionicons 
           name={expanded ? "chevron-up" : "chevron-down"} 
@@ -119,6 +125,12 @@ const styles = StyleSheet.create({
   growth: {
     fontSize: 13,
     fontFamily: 'Inter_600SemiBold',
+  },
+  emptyHint: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecond,
+    marginTop: 2,
   },
   pills: {
     flexDirection: 'row',

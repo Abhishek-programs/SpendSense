@@ -17,6 +17,8 @@ import {
   setNudgeToggles,
   setLastNotificationDate,
 } from '@/lib/notifications'
+import { runMonthRollover } from '@/lib/bucket-balance'
+import { useOverlay } from '@/hooks/useOverlay'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -33,6 +35,8 @@ export default function RootLayout() {
   const { loadTransactions } = useTransactionsStore()
   const { loadGoals } = useGoalsStore()
 
+  useOverlay()
+
   useEffect(() => {
     runMigrations()
       .then(() => seedDefaults())
@@ -46,12 +50,21 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!playbookLoaded) return
-    const { monthStartDay } = usePlaybookStore.getState()
-    const { start, end } = getMonthRange(monthStartDay)
-    loadBuckets()
+    const pb = usePlaybookStore.getState()
+    const { start, end } = getMonthRange(pb.monthStartDay)
+    loadBuckets().then(() => {
+      if (isOnboarded) {
+        runMonthRollover(pb.monthStartDay, pb.lastBalanceRolloverMonth).then(monthKey => {
+          if (monthKey !== pb.lastBalanceRolloverMonth) {
+            pb.updatePlaybook({ lastBalanceRolloverMonth: monthKey })
+            useBucketsStore.getState().refreshBalances()
+          }
+        })
+      }
+    })
     loadTransactions(start, end)
     loadGoals()
-  }, [playbookLoaded])
+  }, [playbookLoaded, isOnboarded])
 
   // Notification setup — runs once after onboarding
   useEffect(() => {
@@ -77,6 +90,7 @@ export default function RootLayout() {
 
     const spentByBucket: Record<string, { spent: number; limit: number; name: string }> = {}
     spendingBuckets.forEach(b => {
+      if (b.accumulates) return
       spentByBucket[b.id] = {
         spent: ts.getSpentByBucket(b.id),
         limit: b.monthlyAmount,

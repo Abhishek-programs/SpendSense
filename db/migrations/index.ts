@@ -72,7 +72,65 @@ const m0003 = `ALTER TABLE \`buckets\` ADD COLUMN \`show_on_home\` integer DEFAU
 --> statement-breakpoint
 ALTER TABLE \`playbook\` ADD COLUMN \`last_checklist_month\` text;`
 
+const m0004 = `ALTER TABLE \`playbook\` ADD COLUMN \`ef_start_balance\` real DEFAULT 0 NOT NULL;
+--> statement-breakpoint
+INSERT INTO \`buckets\` (\`id\`, \`name\`, \`type\`, \`monthly_amount\`, \`color\`, \`icon\`, \`sort_order\`, \`is_active\`, \`show_on_home\`)
+SELECT 'food', 'Food', 'spending', 8000, '#F97316', '🍽️', 3, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM \`buckets\` WHERE \`id\` = 'food' OR \`name\` = 'Food');
+--> statement-breakpoint
+INSERT INTO \`keyword_mappings\` (\`keyword\`, \`bucket_id\`)
+SELECT 'food', COALESCE((SELECT id FROM buckets WHERE id = 'food' OR name = 'Food' LIMIT 1), 'food')
+WHERE NOT EXISTS (SELECT 1 FROM \`keyword_mappings\` WHERE \`keyword\` = 'food');`
+
+const m0005 = `ALTER TABLE \`goals\` ADD COLUMN \`payment_mode\` text DEFAULT 'pay_in_full' NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`goals\` ADD COLUMN \`upfront_amount\` real;
+--> statement-breakpoint
+ALTER TABLE \`goals\` ADD COLUMN \`emi_tenure_months\` integer;
+--> statement-breakpoint
+ALTER TABLE \`goals\` ADD COLUMN \`is_enabled\` integer DEFAULT true NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`linked_goal_id\` text;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`goal_bucket_role\` text;
+--> statement-breakpoint
+UPDATE \`buckets\` SET \`name\` = 'Pay upfront', \`goal_bucket_role\` = 'upfront'
+WHERE \`id\` = 'bigexpense-equity' OR \`name\` LIKE '%Equity%';
+--> statement-breakpoint
+UPDATE \`buckets\` SET \`name\` = 'EMI reserve', \`goal_bucket_role\` = 'emi_reserve'
+WHERE \`id\` = 'bigexpense-debt' OR \`name\` LIKE '%Debt%';
+--> statement-breakpoint
+UPDATE \`goals\` SET \`payment_mode\` = 'upfront_emi'
+WHERE \`linked_bucket_ids\` LIKE '%bigexpense-equity%' OR \`linked_bucket_ids\` LIKE '%bigexpense-debt%';
+--> statement-breakpoint
+UPDATE \`buckets\` SET \`is_active\` = 0
+WHERE (\`id\` = 'bigexpense-equity' OR \`id\` = 'bigexpense-debt')
+  AND NOT EXISTS (
+    SELECT 1 FROM goals WHERE linked_bucket_ids LIKE '%' || buckets.id || '%'
+  );`
+
+const m0006 = `ALTER TABLE \`playbook\` ADD COLUMN \`last_balance_rollover_month\` text;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`accumulates\` integer DEFAULT false NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`accumulation_cap\` real;
+--> statement-breakpoint
+CREATE TABLE \`bucket_balances\` (
+\`id\` text PRIMARY KEY NOT NULL,
+\`bucket_id\` text NOT NULL,
+\`balance\` real DEFAULT 0 NOT NULL,
+\`updated_at\` text NOT NULL
+);
+--> statement-breakpoint
+INSERT INTO \`buckets\` (\`id\`, \`name\`, \`type\`, \`monthly_amount\`, \`color\`, \`icon\`, \`sort_order\`, \`is_active\`, \`show_on_home\`, \`accumulates\`, \`accumulation_cap\`)
+SELECT 'personal', 'Personal', 'spending', 5000, '#7C3AED', '👤', 4, 1, 1, 1, 20000
+WHERE NOT EXISTS (SELECT 1 FROM \`buckets\` WHERE \`id\` = 'personal' OR \`name\` = 'Personal');
+--> statement-breakpoint
+INSERT INTO \`keyword_mappings\` (\`keyword\`, \`bucket_id\`)
+SELECT 'personal', COALESCE((SELECT id FROM buckets WHERE id = 'personal' OR name = 'Personal' LIMIT 1), 'personal')
+WHERE NOT EXISTS (SELECT 1 FROM \`keyword_mappings\` WHERE \`keyword\` = 'personal');`
+
 export const migrations = {
   journal,
-  migrations: { m0000, m0001, m0002, m0003 },
+  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006 },
 }

@@ -18,7 +18,7 @@ export default function GoalsScreen() {
   const { goals } = useGoalsStore()
   const { transactions } = useTransactionsStore()
   const { buckets } = useBucketsStore()
-  const { efFloor } = usePlaybookStore()
+  const { efFloor, efStartBalance } = usePlaybookStore()
 
   const [selectedGoal, setSelectedGoal] = useState<(Goal & { current: number; color: string }) | null>(null)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -44,9 +44,13 @@ export default function GoalsScreen() {
         monthlyContribution: efBucket.monthlyAmount,
         targetDate: null,
         linkedBucketIds: [efBucket.id],
-        startBalance: 0,
+        startBalance: efStartBalance,
         createdAt: '',
-        current: efContributed,
+        paymentMode: 'pay_in_full' as const,
+        upfrontAmount: null,
+        emiTenureMonths: null,
+        isEnabled: true,
+        current: efStartBalance + efContributed,
         color: '#3B82F6',
         isEF: true,
       })
@@ -71,11 +75,13 @@ export default function GoalsScreen() {
     })
 
     return result
-  }, [goals, transactions, buckets, efBucket, efFloor])
+  }, [goals, transactions, buckets, efBucket, efFloor, efStartBalance])
 
   // Summary calculations
   const totalSaved = goalsWithStatus.reduce((sum, g) => sum + g.current, 0)
-  const totalMonthlyCommitment = goalsWithStatus.reduce((sum, g) => sum + g.monthlyContribution, 0)
+  const totalMonthlyCommitment = goalsWithStatus
+    .filter(g => g.isEF || g.isEnabled !== false)
+    .reduce((sum, g) => sum + (g.isEnabled === false ? 0 : g.monthlyContribution), 0)
   // EF coverage = target / Core Living monthly (how many months of core expenses covered)
   const coreLivingBucket = buckets.find(b => b.name === 'Core Living' && b.isActive)
   const coreLivingMonthly = coreLivingBucket?.monthlyAmount ?? 0
@@ -136,6 +142,7 @@ export default function GoalsScreen() {
             target={goal.targetAmount}
             monthly={goal.monthlyContribution}
             color={goal.color}
+            paused={!goal.isEF && goal.isEnabled === false}
             onPress={() => {
               setSelectedGoal(goal)
               setDetailVisible(true)

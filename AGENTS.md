@@ -41,7 +41,8 @@ Copy `.env.example` → `.env`. See `.env.example` for EAS/OCR vars when needed.
 | State | Zustand (`store/`) |
 | Database | expo-sqlite + Drizzle (`db/`) |
 | Charts | react-native-gifted-charts |
-| OCR (target) | `rn-mlkit-ocr` on-device — `lib/ocr.ts` is still mocked |
+| OCR | `rn-mlkit-ocr` on-device — `lib/ocr.ts` + per-app templates in `lib/ocr-templates/`; dev client required |
+| Overlay (V2) | Kotlin in `native/android/overlay/` + `plugins/withSpendSenseOverlay.js` (applied on prebuild) |
 | Fonts | Inter via `@expo-google-fonts/inter` |
 
 No tests in V1. No drive-by refactors.
@@ -53,7 +54,7 @@ No tests in V1. No drive-by refactors.
 ```
 app/
   _layout.tsx           DB init, font load, store hydration, nudges
-  onboarding/           5-step first-launch wizard
+  onboarding/           6-step first-launch wizard
   (tabs)/               Home, Transactions, Goals, Settings + center [+]
 
 components/
@@ -66,9 +67,12 @@ components/
 
 store/                  Zustand — playbook, buckets, transactions, goals
 db/                     schema.ts, client.ts, migrations/, seed.ts
-lib/                    format, categorize, projection, ocr, notifications, month, chart-data
-constants/              colors.ts (design tokens), defaults.ts (playbook defaults)
-hooks/                  usePulseData.ts
+lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, goals/plan, goals/actions, dev/mock-data, …
+native/android/overlay/ Kotlin overlay module (source of truth; copied to android/ on prebuild)
+plugins/                withSpendSenseOverlay.js — manifest, gradle, MainApplication, copy overlay sources
+constants/              colors.ts, defaults.ts (no seeded BigExpense buckets — goals create buckets dynamically)
+components/onboarding/  OnboardingBack (subtle chevron)
+hooks/                  usePulseData.ts, useOverlay.ts
 docs/                   screen-flows, prd, overlay-v2 prompt, mockup
 .claude/skills/         Agent skills (see below)
 ```
@@ -113,9 +117,9 @@ Never auto-memorize ambiguous merchants.
 
 ## V1 scope (short)
 
-**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard, transactions + charts, goals, settings/playbook, 5-step onboarding, month checklist, nudges, CSV export.
+**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (dual safe-to-spend), transactions + charts, goals, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export, dev mock inject.
 
-**Out:** bubble overlay, share intent, SMS/email, dark mode, AI chat, iOS, cloud sync.
+**Out:** share intent, SMS/email, dark mode, AI chat, iOS, cloud sync. Bubble overlay requires dev client build.
 
 ---
 

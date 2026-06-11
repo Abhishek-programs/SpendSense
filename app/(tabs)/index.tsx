@@ -7,10 +7,17 @@ import { HeroRing } from '@/components/home/HeroRing'
 import { LivingSection } from '@/components/home/LivingSection'
 import { FutureSection } from '@/components/home/FutureSection'
 import { NetWorthCard } from '@/components/home/NetWorthCard'
+import { EFGoalCard } from '@/components/home/EFGoalCard'
+import { ShareConfirmSheet } from '@/components/home/ShareConfirmSheet'
 import { FlaggedTransactionPrompt } from '@/components/flagged/FlaggedTransactionPrompt'
 import { MonthStartChecklist, type ChecklistItem } from '@/components/home/MonthStartChecklist'
 import { usePlaybookStore } from '@/store/playbook'
 import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
+import { useBucketsStore } from '@/store/buckets'
+import { useGoalsStore } from '@/store/goals'
+import { buildFutureGroups, checklistLabel } from '@/lib/goals/future-groups'
+
+import { SHARES_BUCKET_ID, SIP_BUCKET_ID, EF_BUCKET_ID } from '@/constants/defaults'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -21,19 +28,27 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const { transactions } = useTransactionsStore()
+  const { buckets } = useBucketsStore()
+  const { goals } = useGoalsStore()
   const {
     userName,
     monthStartDay,
     monthlyIncome,
     lastChecklistMonth,
-    updatePlaybook
+    efFloor,
+    updatePlaybook,
   } = usePlaybookStore()
   const {
     totalIncome,
-    available,
+    actualSafeToSpend,
+    safeBeforeInvestments,
+    plannedSavings,
     flaggedAmount,
-    unconfirmedSavings,
     confirmedSavings,
+    stillToSave,
+    stillToInvest,
+    lifestyleSpent,
+    bucketBalances,
     daysRemaining,
     weeklyRate,
     totalSpent,
@@ -49,10 +64,14 @@ export default function HomeScreen() {
     totalLiabilities,
     savingsRate,
     assetBreakdown,
+    hasAnyData,
+    efValue,
   } = usePulseData()
 
   const [promptVisible, setPromptVisible] = useState(false)
   const [checklistVisible, setChecklistVisible] = useState(false)
+  const [shareSheetVisible, setShareSheetVisible] = useState(false)
+  const [shareBucketId, setShareBucketId] = useState<string | null>(null)
 
   const flagged = transactions.filter(t => t.isFlagged)
 
@@ -75,14 +94,14 @@ export default function HomeScreen() {
     savingsBuckets.forEach(b => {
       items.push({
         id: b.id,
-        label: b.name,
+        label: checklistLabel(b, goals),
         amount: b.monthlyAmount,
         bucketId: b.id,
         completed: confirmedSavingIds.has(b.id),
       })
     })
     return items
-  }, [monthlyIncome, savingsBuckets, hasSalaryThisMonth, confirmedSavingIds])
+  }, [monthlyIncome, savingsBuckets, hasSalaryThisMonth, confirmedSavingIds, goals])
 
   const checklistAllDone = checklistItems.every(i => i.completed)
   const checklistPending = lastChecklistMonth !== currentMonthKey && !checklistAllDone
@@ -138,6 +157,16 @@ export default function HomeScreen() {
   const handleConfirmSavings = async (bucketId: string) => {
     const bucket = savingsBuckets.find(b => b.id === bucketId)
     if (!bucket || confirmedSavingIds.has(bucketId)) return
+
+    const isShares =
+      bucket.id === SHARES_BUCKET_ID || bucket.name === 'Direct Shares'
+
+    if (isShares) {
+      setShareBucketId(bucketId)
+      setShareSheetVisible(true)
+      return
+    }
+
     await addTransaction({
       type: 'expense',
       amount: bucket.monthlyAmount,
@@ -152,7 +181,34 @@ export default function HomeScreen() {
     })
   }
 
-  const futureBuckets = savingsBuckets
+  const handleShareConfirm = async (amount: number) => {
+    if (!shareBucketId) return
+    const bucket = savingsBuckets.find(b => b.id === shareBucketId)
+    if (!bucket) return
+    await addTransaction({
+      type: 'expense',
+      amount,
+      merchant: bucket.name,
+      bucketId: bucket.id,
+      date: new Date().toISOString(),
+      source: 'manual',
+      remarks: '__savings_confirm__',
+      parsedTxnId: null,
+      isFlagged: false,
+      isRecurringDraft: false,
+    })
+    setShareBucketId(null)
+  }
+
+  const efBucket = buckets.find(b => b.id === EF_BUCKET_ID)
+  const shareBucket = shareBucketId
+    ? savingsBuckets.find(b => b.id === shareBucketId)
+    : null
+
+  const { goalGroups, standaloneBuckets } = useMemo(
+    () => buildFutureGroups(savingsBuckets, goals),
+    [savingsBuckets, goals],
+  )
 
   return (
     <View style={styles.container}>
@@ -219,29 +275,41 @@ export default function HomeScreen() {
           liabilities={totalLiabilities}
           savingsRate={savingsRate}
           breakdown={assetBreakdown.map(a => ({ label: a.name, value: a.value }))}
+          emptyHint={!hasAnyData ? 'Your plan is live — net worth builds from here' : undefined}
         />
 
-        {/* Hero Ring */}
+        {efBucket && efFloor > 0 && (
+          <EFGoalCard
+            current={efValue}
+            target={efFloor}
+            monthlyContribution={efBucket.monthlyAmount}
+          />
+        )}
+
         <HeroRing
           totalIncome={totalIncome}
-          available={available}
+          actualSafeToSpend={actualSafeToSpend}
+          safeBeforeInvestments={safeBeforeInvestments}
+          plannedSavings={plannedSavings}
           flaggedAmount={flaggedAmount}
-          unconfirmedSavings={unconfirmedSavings}
           daysRemaining={daysRemaining}
           weeklyRate={weeklyRate}
           totalSpent={totalSpent}
-          confirmedSavings={confirmedSavings}
+          stillToSave={stillToSave}
+          stillToInvest={stillToInvest}
+          lifestyleSpent={lifestyleSpent}
         />
 
-        {/* Living — Spending */}
         <LivingSection
           buckets={spendingBuckets}
           spentByBucket={spentByBucket}
+          bucketBalances={bucketBalances}
         />
 
         {/* Future — Savings checklist */}
         <FutureSection
-          buckets={futureBuckets}
+          goalGroups={goalGroups}
+          standaloneBuckets={standaloneBuckets}
           confirmedBucketIds={confirmedSavingIds}
           onConfirm={handleConfirmSavings}
         />
@@ -253,6 +321,17 @@ export default function HomeScreen() {
         visible={promptVisible}
         flaggedTransactions={flagged}
         onClose={() => setPromptVisible(false)}
+      />
+
+      <ShareConfirmSheet
+        visible={shareSheetVisible}
+        bucketName={shareBucket?.name ?? 'Direct Shares'}
+        defaultAmount={shareBucket?.monthlyAmount ?? 0}
+        onConfirm={handleShareConfirm}
+        onClose={() => {
+          setShareSheetVisible(false)
+          setShareBucketId(null)
+        }}
       />
 
       <MonthStartChecklist

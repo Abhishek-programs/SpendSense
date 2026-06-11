@@ -10,6 +10,7 @@ import {
   Platform,
   StyleSheet,
   Keyboard,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -31,7 +32,7 @@ interface ManualEntrySheetProps {
 export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const amountRef = useRef<TextInput>(null)
 
-  const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants } = useBucketsStore()
+  const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants, buckets } = useBucketsStore()
   const { fallbackBucketId } = usePlaybookStore()
   const { addTransaction } = useTransactionsStore()
 
@@ -50,6 +51,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const [isRecurring, setIsRecurring] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [fromOcr, setFromOcr] = useState(false)
 
   // Reset form when sheet opens
   useEffect(() => {
@@ -64,6 +66,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
       setShowDatePicker(false)
       setIsRecurring(false)
       setSaving(false)
+      setFromOcr(false)
     }
   }, [visible])
 
@@ -90,32 +93,39 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
           isRecurringDraft: isRecurring,
         })
       } else {
-        // Run categorization — remarks prefix overrides selected bucket
-        const result = categorize({
+        const catInput = {
           remarks: remarks.trim() || null,
           merchant: merchant.trim() || null,
           keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
           sureShotMerchants: sureShotMerchants.map(m => ({ merchantName: m.merchantName, bucketId: m.bucketId })),
           fallbackBucketId: fallbackBucketId ?? allBuckets[0]?.id ?? '',
-        })
+        }
+        const result = categorize(catInput)
 
-        // If user explicitly selected a bucket and no remarks prefix override, use their selection
-        const hasRemarksPrefix = remarks.trim().startsWith('#')
+        const hasRemarksPrefix = remarks.trim().match(/(\S+)\s*-\s*$/) !== null
         const finalBucketId = hasRemarksPrefix ? result.bucketId : (selectedBucketId ?? result.bucketId)
         const finalFlagged = hasRemarksPrefix ? result.isFlagged : (selectedBucketId ? false : result.isFlagged)
 
-        await addTransaction({
+        const { overspent } = await addTransaction({
           type: 'expense',
           amount: parsedAmount,
           merchant: merchant.trim() || null,
           bucketId: finalBucketId,
           date: date.toISOString(),
-          source: 'manual',
+          source: fromOcr ? 'ocr' : 'manual',
           remarks: remarks.trim() || null,
           parsedTxnId: null,
           isFlagged: finalFlagged,
           isRecurringDraft: isRecurring,
         })
+
+        const bucket = buckets.find(b => b.id === finalBucketId)
+        if (overspent && bucket?.accumulates) {
+          Alert.alert(
+            'Personal fund empty',
+            `Personal fund empty — NPR ${formatNPR(overspent)} overspent.`,
+          )
+        }
       }
       onClose()
     } catch (e) {
@@ -202,13 +212,31 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                       setScanning(true)
                       try {
                         const ocr = await processReceiptImage(result.assets[0].uri)
-                        if (ocr.amount) setAmount(ocr.amount.toString())
+                        if (!ocr?.amount) {
+                          alert("Doesn't look like a receipt — fill manually.")
+                          setMode('manual')
+                          return
+                        }
+
+                        setAmount(String(ocr.amount))
                         if (ocr.merchant) setMerchant(ocr.merchant)
                         if (ocr.remarks) setRemarks(ocr.remarks)
-                        // Auto-switch to manual mode to review
+                        if (ocr.date) setDate(new Date(ocr.date))
+
+                        const catResult = categorize({
+                          remarks: ocr.remarks,
+                          merchant: ocr.merchant,
+                          keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
+                          sureShotMerchants: sureShotMerchants.map(m => ({ merchantName: m.merchantName, bucketId: m.bucketId })),
+                          fallbackBucketId: fallbackBucketId ?? allBuckets[0]?.id ?? '',
+                        })
+                        if (catResult.bucketId) setSelectedBucketId(catResult.bucketId)
+
+                        setFromOcr(true)
                         setMode('manual')
-                      } catch (e) {
-                        alert('Could not scan receipt. Please try manual entry.')
+                      } catch {
+                        alert('Could not scan receipt. Use a dev client with ML Kit, or fill manually.')
+                        setMode('manual')
                       } finally {
                         setScanning(false)
                       }
