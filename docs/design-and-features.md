@@ -17,34 +17,60 @@ Center **green FAB** → Manual Entry / Scan Receipt (not a tab).
 
 ## Home
 
+**Scroll order:** greeting + checklist banner → **Your money** → **Hero ring** → **Lent & Borrowed** → **Living** → **Future**.  
+Headers use safe-area inset (`insets.top + 12`) on all tabs.
+
 ### Your money card (collapsed default)
 | Collapsed | Expanded |
 |-----------|----------|
 | **available balance** | **intentional savings** + breakdown (EF, goals, SIP, Shares) |
 | | Remaining this month + carried-forward if > 0 |
 
+Net worth accordion: **Lent out** (asset) · **You owe** (liability).
+
 ### Hero ring
 - **Center:** Safe to spend (locked until salary confirmed this month)
-- **Arcs:** grey unallocated · teal outline planned savings · green available · red spent · teal solid saved · yellow flagged
-- **Pills** (small, on ring edge): days left, invested, spent, to invest / saved ✓, carried forward
+- **Arcs:** green available · red spent · purple lent out (this month) · teal savings (confirmed + unconfirmed)
+- **Stroke:** uniform width on all arcs; unconfirmed savings use lower opacity (not a thicker stroke)
+- **Orbit chips** (compact, color-only numbers on ring edge, subtle float animation): `{days}d` · spent · saved (saved only when > 0)
+- **Legend** below ring labels each arc color (chips are numbers only; legend is the key)
+
+### Lent & Borrowed
+- Person-based running balance — not a bucket or income/expense
+- Compact row below ring: net balance, tap → `/lending` person list
+- FAB third toggle: Lend/Borrow (person, direction, note, date)
+- Settle up reduces balance without logging income/expense
+- Ledger **Lending** filter shows lend/borrow/settle history
 
 ### Living
-Core Living, Dates, Fun (budget bars) · Personal (fund bar, rolls over)
+Core Living, Dates, Fun (budget bars) · Personal (fund bar, rolls over).  
+Plain emoji icon column — no tinted icon background. Rows stagger in with `FadeInDown`.
 
 ### Future
-EF + goals: fixed confirm · SIP/Shares: editable · placeholder when no big-spend goal
+Savings checklist at the bottom of Home — **EF lives here** (no separate EF card above the ring).
+
+Each row shows:
+- Monthly amount + tappable check-off (`__savings_confirm__`; same logic as month-start checklist)
+- Thin progress bar + `NPR current / target · %` (EF uses blue accent + shield icon)
+- EF + goal buckets: fixed confirm · SIP/Shares: editable amount in detail flows
+- Placeholder CTA when no big-spend goal yet
+
+Animated checkmark on confirm; progress bars animate fill width.
 
 ---
 
 ## Ledger
 
-List / Chart toggle · filters · flagged amber border · **description** as main line, merchant as subtitle when different
+List / Chart toggle · filters (including **Lending**) · flagged amber border · **description** as main line, merchant as subtitle when different.
+
+**Charts:** sentence-case section titles · `FadeIn` on cards · six-month trend bars with top NPR labels (`overflowTop` / extra card padding so labels aren't clipped) · softer bar radii · non-current trend months at lower green opacity.
 
 ---
 
 ## Vault
 
-Active goals · Completed (archived) · SIP suggested target when age set · inline monthly edit in detail sheet
+Active goals · Completed (archived) · SIP suggested target when age set · inline monthly edit in detail sheet.  
+Goal cards use softened shadows; list rows stagger in with `FadeInDown`.
 
 ---
 
@@ -57,7 +83,15 @@ Manual: remarks empty. OCR: merchant + remarks from receipt.
 
 ## Settings
 
-Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · notifications · scan bubble · CSV export · reset all data
+Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · notifications · **Scan Bubble** (Android) · CSV export · reset all data
+
+### Scan Bubble (Android, dev client)
+
+Requires overlay + app usage + screen capture permissions. See [overlay-v2.md](./overlay-v2.md).
+
+- Toggle enables draggable green bubble over **whitelisted banking apps** only
+- Tap → silent screenshot → headless OCR → auto-save transaction (`source: overlay`)
+- Default targets: eSewa, Khalti, Chrome (editable in `constants/overlay-targets.ts`)
 
 ---
 
@@ -84,11 +118,23 @@ suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
 
 ---
 
+## UI polish (shipped)
+
+- Uniform hero ring stroke; compact orbit metric chips
+- Home reorder + EF folded into Future with progress %
+- Living icons without background boxes; animated progress bars
+- Safe-area headers on Home, Ledger, Vault, Settings
+- Lending screens: consistent 16px card radius, staggered list entrances
+
+---
+
 ## Status
 
 | Feature | Status |
 |---------|--------|
 | Home finance UX overhaul | Shipped |
+| Lent & borrowed (person ledger, ring slice, net worth) | Shipped |
+| Full-app design polish | Shipped |
 | Description field + word categorize | Shipped |
-| OCR + bubble UI | Shipped, device testing |
+| Gallery OCR + scan bubble overlay (Kotlin, headless JS OCR — dev client) | Shipped, device testing |
 | Recurring drafts | Not shipped |

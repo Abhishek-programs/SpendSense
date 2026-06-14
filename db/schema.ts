@@ -95,3 +95,19 @@ export const netWorthSnapshots = sqliteTable('net_worth_snapshots', {
   totalLiabilities: real('total_liabilities').notNull().default(0),
   note: text('note'),
 })
+
+export const contacts = sqliteTable('contacts', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const lendBorrowEntries = sqliteTable('lend_borrow_entries', {
+  id: text('id').primaryKey(),
+  contactId: text('contact_id').notNull(),
+  type: text('type', { enum: ['lend', 'borrow', 'settle'] }).notNull(),
+  amount: real('amount').notNull(),
+  note: text('note'),
+  date: text('date').notNull(),
+  createdAt: text('created_at').notNull(),
+})

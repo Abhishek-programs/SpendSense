@@ -1,4 +1,10 @@
+import { useEffect } from 'react'
 import { View } from 'react-native'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated'
 import { colors } from '@/constants/colors'
 
 interface ProgressBarProps {
@@ -30,6 +36,17 @@ export function ProgressBar({
 }: ProgressBarProps) {
   const clampedWidth = Math.min(Math.max(value, 0), 1)
   const barColor = color ?? getBarColor(value, mode)
+
+  const widthSv = useSharedValue(clampedWidth)
+
+  useEffect(() => {
+    widthSv.value = withTiming(clampedWidth, { duration: 300 })
+  }, [clampedWidth])
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${widthSv.value * 100}%`,
+  }))
+
   return (
     <View
       style={{
@@ -39,13 +56,15 @@ export function ProgressBar({
         overflow: 'hidden',
       }}
     >
-      <View
-        style={{
-          height,
-          width: `${clampedWidth * 100}%`,
-          borderRadius: height / 2,
-          backgroundColor: barColor,
-        }}
+      <Animated.View
+        style={[
+          {
+            height,
+            borderRadius: height / 2,
+            backgroundColor: barColor,
+          },
+          fillStyle,
+        ]}
       />
     </View>
   )

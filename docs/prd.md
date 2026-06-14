@@ -121,26 +121,27 @@ Gallery pick → pre-filled entry form in under 3 seconds.
 
 ---
 
-### F2 — Floating Bubble Capture *(V2)*
+### F2 — Floating Bubble Capture *(V2 — shipped in codebase)*
 
 **Description**
-A floating overlay bubble on Android. User taps it on any receipt screen; SpendSense captures a screenshot via `MediaProjection`, runs on-device OCR (ML Kit in Kotlin), parses with shared `parseOcrText`, categorizes, and saves — entirely in the background. User never leaves their payment app.
+A floating overlay bubble on Android. User taps it on a receipt screen in a whitelisted app; SpendSense captures a screenshot via `MediaProjection`, runs on-device OCR in a **Headless JS worker** (`rn-mlkit-ocr` + shared `processReceiptImage`), categorizes, and saves — user never leaves their payment app.
 
 **Permissions Required**
 - `SYSTEM_ALERT_WINDOW` (Draw over other apps)
+- `PACKAGE_USAGE_STATS` (App usage access — whitelist visibility)
 - `MediaProjection` (Screen capture)
-- Both opt-in via Settings → Scan Bubble
+- All opt-in via Settings → Scan Bubble
 
 **UX Flow**
-1. Enable bubble in Settings after granting both permissions
-2. Pay in banking app → receipt on screen
-3. Tap green floating bubble (draggable, snaps to edge)
-4. Silent capture → OCR → save → toast: `NPR 500 saved` or `NPR 500 saved — needs review`
-5. Transaction appears in Ledger with source badge **Bubble** (or app name when detectable)
+1. Enable bubble in Settings after granting all three permissions
+2. Pay in banking app → receipt on screen (bubble visible only on whitelisted apps)
+3. Tap green floating bubble (draggable, snaps to edge; long-press → stop)
+4. Silent capture → headless OCR → save → toast: `NPR 500 saved` or `… needs review`
+5. Transaction appears in Ledger with source badge **Bubble**
 
-**Implementation**
-- Native Kotlin module in `native/android/overlay/` applied via Expo config plugin on prebuild
-- TypeScript bridge: `lib/overlay.ts`, `hooks/useOverlay.ts`
+**Implementation** *(see [overlay-v2.md](./overlay-v2.md) for current architecture)*
+- Native Kotlin in `native/android/screenshotbubble/` via `plugins/withSpendSenseOverlay.js`
+- TypeScript: `lib/overlay.ts`, `lib/overlay-headless.ts`, `index.js` (headless task)
 
 ---
 
@@ -290,7 +291,7 @@ One-time setup during onboarding, fully editable at any time.
 
 **Settings (always accessible)**
 - Edit any bucket, income, floors, keywords
-- Scan Bubble — overlay permissions + enable toggle (Android, dev client)
+- Scan Bubble — overlay + app usage + screen capture permissions + enable toggle (Android, dev client)
 - Dev mock-data inject (`__DEV__`)
 - Data export (CSV)
 
@@ -470,10 +471,11 @@ On track:         ✅ ~8 months away
 - App requires **EAS Build + expo-dev-client** — native modules not in Expo Go
 
 ### 6.1b Bubble Overlay (V2)
-- Kotlin foreground service + `FloatingBubbleView` + `ScreenCaptureManager`
-- ML Kit OCR in native layer; results bridged to JS via `OcrResultBridge`
-- `hooks/useOverlay.ts` — parse → categorize → `addTransaction` with `source: 'overlay'`
-- Config plugin: `plugins/withSpendSenseOverlay.js` copies `native/android/overlay/` on prebuild
+- Kotlin foreground service (`ScreenshotBubbleService`) + `BubbleOverlayView` + `ScreenCaptureHelper`
+- Usage-stats whitelist — bubble hidden on non-target apps
+- Headless JS OCR (`ScreenshotHeadlessTaskService` → `lib/overlay-headless.ts`) — same `processReceiptImage` as gallery OCR
+- Config plugin: `plugins/withSpendSenseOverlay.js` copies `native/android/screenshotbubble/` on prebuild
+- Full spec: [overlay-v2.md](./overlay-v2.md)
 
 ### 6.2 Data Storage
 - All data stored **on-device only** — no server, no cloud sync (V1)

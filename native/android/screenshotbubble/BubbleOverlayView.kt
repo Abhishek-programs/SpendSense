@@ -1,25 +1,23 @@
-package com.anonymous.SpendSense.overlay
+package com.screenshotbubble
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
-import kotlin.math.abs
 import kotlin.math.hypot
 
-class FloatingBubbleView(
-  private val context: Context,
+class BubbleOverlayView(
+  context: Context,
   private val windowManager: WindowManager,
   private val onCaptureRequested: () -> Unit,
+  private val onStopRequested: () -> Unit,
 ) : FrameLayout(context) {
 
   private val params = WindowManager.LayoutParams(
@@ -45,22 +43,23 @@ class FloatingBubbleView(
   private var isDragging = false
 
   init {
-    val circle = GradientDrawable().apply {
+    background = GradientDrawable().apply {
       shape = GradientDrawable.OVAL
       setColor(Color.parseColor("#16A34A"))
     }
-    background = circle
     isClickable = true
+    isFocusable = true
 
-    val icon = TextView(context).apply {
-      text = "◎"
-      setTextColor(Color.WHITE)
-      textSize = 22f
-      gravity = Gravity.CENTER
-    }
-    addView(icon, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+    addView(
+      TextView(context).apply {
+        text = "◎"
+        setTextColor(Color.WHITE)
+        textSize = 22f
+        gravity = Gravity.CENTER
+      },
+      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+    )
 
-    isLongClickable = true
     setOnLongClickListener {
       showStopButton()
       true
@@ -68,7 +67,7 @@ class FloatingBubbleView(
   }
 
   fun attach() {
-    val metrics = context.resources.displayMetrics
+    val metrics = resources.displayMetrics
     params.x = metrics.widthPixels - dp(72)
     params.y = metrics.heightPixels / 2 - dp(28)
     windowManager.addView(this, params)
@@ -77,7 +76,10 @@ class FloatingBubbleView(
   fun detach() {
     stopButton?.let { windowManager.removeView(it) }
     stopButton = null
-    windowManager.removeView(this)
+    try {
+      windowManager.removeView(this)
+    } catch (_: IllegalArgumentException) {
+    }
   }
 
   override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -90,6 +92,7 @@ class FloatingBubbleView(
         isDragging = false
         return true
       }
+
       MotionEvent.ACTION_MOVE -> {
         val dx = event.rawX - touchStartX
         val dy = event.rawY - touchStartY
@@ -101,6 +104,7 @@ class FloatingBubbleView(
         windowManager.updateViewLayout(this, params)
         return true
       }
+
       MotionEvent.ACTION_UP -> {
         if (!isDragging) {
           onCaptureRequested()
@@ -111,11 +115,6 @@ class FloatingBubbleView(
       }
     }
     return super.onTouchEvent(event)
-  }
-
-  override fun performLongClick(): Boolean {
-    showStopButton()
-    return true
   }
 
   private fun showStopButton() {
@@ -130,11 +129,7 @@ class FloatingBubbleView(
         cornerRadius = dp(8).toFloat()
         setColor(Color.parseColor("#374151"))
       }
-      setOnClickListener {
-        context.startService(
-          Intent(context, OverlayService::class.java).apply { action = OverlayService.ACTION_STOP },
-        )
-      }
+      setOnClickListener { onStopRequested() }
     }
 
     val stopParams = WindowManager.LayoutParams(
@@ -154,21 +149,21 @@ class FloatingBubbleView(
   }
 
   private fun snapToEdge() {
-    val metrics = context.resources.displayMetrics
+    val metrics = resources.displayMetrics
     val mid = metrics.widthPixels / 2
     val targetX = if (params.x + width / 2 < mid) dp(8) else metrics.widthPixels - width - dp(8)
     val startX = params.x
-    android.animation.ValueAnimator.ofInt(startX, targetX).apply {
+
+    ValueAnimator.ofInt(startX, targetX).apply {
       duration = 200
       addUpdateListener { animator ->
         params.x = animator.animatedValue as Int
-        windowManager.updateViewLayout(this@FloatingBubbleView, params)
+        windowManager.updateViewLayout(this@BubbleOverlayView, params)
       }
       start()
     }
   }
 
-  private fun dp(value: Int): Int {
-    return (value * context.resources.displayMetrics.density).toInt()
-  }
+  private fun dp(value: Int): Int =
+    (value * resources.displayMetrics.density).toInt()
 }

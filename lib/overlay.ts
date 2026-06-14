@@ -1,49 +1,55 @@
-import { NativeModules, NativeEventEmitter, Platform } from 'react-native'
+import { NativeModules, Platform } from 'react-native'
+import { DEFAULT_OVERLAY_TARGET_APPS } from '@/constants/overlay-targets'
 
-export type OcrResult = {
-  rawText: string
-  timestamp: number
-}
-
-const OverlayModule = NativeModules.OverlayModule
-const OcrResultBridge = NativeModules.OcrResultBridge
+const BubbleModule = NativeModules.BubbleModule
 
 export const Overlay = {
-  start: (): Promise<boolean> => {
-    if (Platform.OS !== 'android' || !OverlayModule?.startOverlay) {
+  checkUsagePermission: (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !BubbleModule?.checkUsagePermission) {
       return Promise.resolve(false)
     }
-    return OverlayModule.startOverlay()
+    return BubbleModule.checkUsagePermission()
   },
-  stop: (): Promise<boolean> => {
-    if (Platform.OS !== 'android' || !OverlayModule?.stopOverlay) {
-      return Promise.resolve(false)
-    }
-    return OverlayModule.stopOverlay()
+
+  requestUsagePermission: (): void => {
+    if (Platform.OS !== 'android' || !BubbleModule?.requestUsagePermission) return
+    BubbleModule.requestUsagePermission()
   },
+
   isPermissionGranted: (): Promise<boolean> => {
-    if (Platform.OS !== 'android' || !OverlayModule?.isOverlayPermissionGranted) {
+    if (Platform.OS !== 'android' || !BubbleModule?.checkOverlayPermission) {
       return Promise.resolve(false)
     }
-    return OverlayModule.isOverlayPermissionGranted()
+    return BubbleModule.checkOverlayPermission()
   },
+
   requestPermission: (): void => {
-    if (Platform.OS !== 'android' || !OverlayModule?.requestOverlayPermission) return
-    OverlayModule.requestOverlayPermission()
+    if (Platform.OS !== 'android' || !BubbleModule?.requestOverlayPermission) return
+    BubbleModule.requestOverlayPermission()
   },
-  requestMediaProjection: (): void => {
-    if (Platform.OS !== 'android' || !OverlayModule?.requestMediaProjectionPermission) return
-    OverlayModule.requestMediaProjectionPermission()
-  },
-  onOcrResult: (cb: (result: OcrResult) => void) => {
-    if (Platform.OS !== 'android' || !OcrResultBridge) {
-      return { remove: () => {} }
+
+  requestMediaProjection: (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !BubbleModule?.requestMediaProjectionPermission) {
+      return Promise.resolve(false)
     }
-    const emitter = new NativeEventEmitter(OcrResultBridge)
-    return emitter.addListener('onOcrResult', cb)
+    return BubbleModule.requestMediaProjectionPermission()
+  },
+
+  start: (targetApps: string[] = DEFAULT_OVERLAY_TARGET_APPS): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !BubbleModule?.startBubble) {
+      return Promise.resolve(false)
+    }
+    return BubbleModule.startBubble(-1, targetApps)
+  },
+
+  stop: (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !BubbleModule?.stopBubble) {
+      return Promise.resolve(false)
+    }
+    return BubbleModule.stopBubble()
   },
 }
 
 export function isOverlayAvailable(): boolean {
-  return Platform.OS === 'android' && !!NativeModules.OverlayModule
+  return Platform.OS === 'android' && !!NativeModules.BubbleModule
 }

@@ -12,7 +12,7 @@ import {
   Pressable,
   Animated,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { Card } from '@/components/ui/Card'
@@ -33,8 +33,11 @@ import {
   bucketBalances as bucketBalancesTable,
   playbook,
   goals as goalsTable,
+  contacts as contactsTable,
+  lendBorrowEntries as lendBorrowEntriesTable,
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
+import { useLendingStore } from '@/store/lending'
 import { Overlay, isOverlayAvailable } from '@/lib/overlay'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
@@ -244,6 +247,7 @@ function useSavedFeedback() {
 }
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets()
   const pb = usePlaybookStore()
   const bs = useBucketsStore()
   const txnStore = useTransactionsStore()
@@ -281,11 +285,19 @@ export default function SettingsScreen() {
   // Notification toggles — synced to playbook store
   const [nudges, setNudges] = useState(pb.nudgeToggles)
   const [overlayPerm, setOverlayPerm] = useState(false)
+  const [usagePerm, setUsagePerm] = useState(false)
+  const [mediaReady, setMediaReady] = useState(false)
   const [bubbleEnabled, setBubbleEnabled] = useState(false)
 
   useEffect(() => {
     if (!isOverlayAvailable()) return
-    Overlay.isPermissionGranted().then(setOverlayPerm)
+    Promise.all([
+      Overlay.isPermissionGranted(),
+      Overlay.checkUsagePermission(),
+    ]).then(([overlay, usage]) => {
+      setOverlayPerm(overlay)
+      setUsagePerm(usage)
+    })
   }, [])
 
   const expandBucket = (b: Bucket) => {
@@ -378,11 +390,19 @@ export default function SettingsScreen() {
 
   const handleToggleBubble = async (enabled: boolean) => {
     if (!isOverlayAvailable()) {
-      Alert.alert('Not available', 'Bubble overlay requires a dev client build with native overlay module.')
+      Alert.alert('Not available', 'Bubble overlay requires a dev client build with native BubbleModule.')
       return
     }
     try {
       if (enabled) {
+        if (!overlayPerm || !usagePerm) {
+          Alert.alert('Permissions required', 'Grant overlay and app usage access first.')
+          return
+        }
+        if (!mediaReady) {
+          await Overlay.requestMediaProjection()
+          setMediaReady(true)
+        }
         await Overlay.start()
         setBubbleEnabled(true)
       } else {
@@ -407,6 +427,8 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await db.delete(transactions)
+              await db.delete(lendBorrowEntriesTable)
+              await db.delete(contactsTable)
               await db.delete(goalsTable)
               await db.delete(bucketBalancesTable)
               await db.delete(netWorthSnapshots)
@@ -421,6 +443,9 @@ export default function SettingsScreen() {
               const { start, end } = getMonthRange(pb.monthStartDay)
               await txnStore.loadTransactions(start, end)
               await goalsStore.loadGoals()
+              await useLendingStore.getState().loadContacts()
+              await useLendingStore.getState().loadAllEntries()
+              await useLendingStore.getState().loadEntries(start, end)
               Alert.alert('Done', 'All data cleared and defaults restored.')
             } catch (e) {
               Alert.alert('Error', e instanceof Error ? e.message : 'Could not clear data')
@@ -433,7 +458,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Settings</Text>
         <Animated.Text style={[styles.headerSaved, { opacity: saved.opacity }]}>
           Saved
@@ -912,7 +937,12 @@ export default function SettingsScreen() {
             <Card>
               <TouchableOpacity
                 style={styles.permissionRow}
-                onPress={() => Overlay.requestPermission()}
+                onPress={() => {
+                  Overlay.requestPermission()
+                  setTimeout(() => {
+                    Overlay.isPermissionGranted().then(setOverlayPerm)
+                  }, 800)
+                }}
               >
                 <Text style={styles.permissionLabel}>Draw over other apps</Text>
                 <Ionicons
@@ -924,10 +954,38 @@ export default function SettingsScreen() {
               <View style={styles.divider} />
               <TouchableOpacity
                 style={styles.permissionRow}
-                onPress={() => Overlay.requestMediaProjection()}
+                onPress={() => {
+                  Overlay.requestUsagePermission()
+                  setTimeout(() => {
+                    Overlay.checkUsagePermission().then(setUsagePerm)
+                  }, 800)
+                }}
+              >
+                <Text style={styles.permissionLabel}>App usage access</Text>
+                <Ionicons
+                  name={usagePerm ? 'checkmark-circle' : 'close-circle'}
+                  size={22}
+                  color={usagePerm ? colors.green : colors.red}
+                />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.permissionRow}
+                onPress={async () => {
+                  try {
+                    await Overlay.requestMediaProjection()
+                    setMediaReady(true)
+                  } catch {
+                    setMediaReady(false)
+                  }
+                }}
               >
                 <Text style={styles.permissionLabel}>Screen capture access</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                <Ionicons
+                  name={mediaReady ? 'checkmark-circle' : 'chevron-forward'}
+                  size={22}
+                  color={mediaReady ? colors.green : colors.textMuted}
+                />
               </TouchableOpacity>
               <View style={styles.divider} />
               <View style={styles.permissionRow}>
@@ -935,7 +993,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={bubbleEnabled}
                   onValueChange={handleToggleBubble}
-                  disabled={!overlayPerm}
+                  disabled={!overlayPerm || !usagePerm}
                   trackColor={{ false: colors.border, true: colors.greenFill }}
                   thumbColor={bubbleEnabled ? colors.green : '#f4f3f4'}
                 />

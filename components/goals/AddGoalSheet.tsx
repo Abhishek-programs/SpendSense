@@ -10,6 +10,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native'
 import Slider from '@react-native-community/slider'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -82,6 +83,15 @@ export function AddGoalSheet({ visible, onClose, editGoal }: AddGoalSheetProps) 
     }
   }, [target, editGoal, upfrontAmount])
 
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [visible, onClose])
+
   const saved = parseFloat(startBalance) || 0
   const targetDateObj = parseTargetDate(targetDate || null, 18)
   const monthsRemaining = monthsBetween(new Date(), targetDateObj)
@@ -142,7 +152,7 @@ export function AddGoalSheet({ visible, onClose, editGoal }: AddGoalSheetProps) 
     (parseFloat(monthlyContribution) > 0 || (plan?.totalMonthly ?? backCalc) > 0)
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

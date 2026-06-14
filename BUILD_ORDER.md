@@ -11,7 +11,9 @@ What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md)
 | DB + Drizzle + seed + migrations (through `m0008` description column) | Done |
 | Zustand stores + root hydration + month rollover / surplus carry-forward | Done |
 | 6-step onboarding (Foundations → Goals → Bucket Builder → Balances) | Done |
-| Home — Your money card, Hero ring v2, Living / Future sections, EF card | Done |
+| Home — Your money → ring → lent/borrow → Living → Future (EF + progress in Future) | Done |
+| Lent & borrowed — contacts, person ledger, settle up, ring slice, net worth, FAB toggle | Done |
+| Full-app design polish — ring chips, animations, safe-area headers, chart labels | Done |
 | Salary-gated safe to spend (checklist unlocks ring for the month) | Done |
 | Personal accumulating fund + cap prompts | Done |
 | Goal completion → Vault archived + reallocation prompt | Done |
@@ -34,12 +36,16 @@ What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md)
 
 ### Overlay
 
-- [ ] Dev client build (includes native overlay module)
-- [ ] Grant draw-over + screen capture in Settings → Scan Bubble
-- [ ] Bubble capture → silent save + toast; flagged review flow
+- [ ] Dev client build (`npx expo prebuild --clean && npx expo run:android`)
+- [ ] Grant overlay + **app usage access** + screen capture in Settings → Scan Bubble
+- [ ] Bubble visible only on whitelisted apps (eSewa, Khalti, Chrome, …)
+- [ ] Tap bubble → headless OCR → transaction saved with `source: overlay` + toast
+
+See [docs/overlay-v2.md](./docs/overlay-v2.md) for architecture.
 
 ### Polish
 
+- [x] Home reorder, EF in Future, compact ring chips, section animations (see `design-and-features.md`)
 - [ ] Geist Mono fonts per `docs/design.md` (optional)
 - [ ] Auto-create recurring drafts on month start (PRD F5)
 

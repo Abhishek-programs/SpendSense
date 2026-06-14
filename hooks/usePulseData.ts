@@ -2,7 +2,9 @@ import { usePlaybookStore } from '@/store/playbook'
 import { useBucketsStore } from '@/store/buckets'
 import { useTransactionsStore } from '@/store/transactions'
 import { useGoalsStore } from '@/store/goals'
+import { useLendingStore } from '@/store/lending'
 import { getMonthRange, getDaysRemaining } from '@/lib/month'
+import { computeMonthMetrics } from '@/lib/lending/balance'
 import { EF_BUCKET_ID, SIP_BUCKET_ID, SHARES_BUCKET_ID } from '@/constants/defaults'
 
 export function usePulseData() {
@@ -17,6 +19,8 @@ export function usePulseData() {
     transactions,
   } = useTransactionsStore()
   const { goals } = useGoalsStore()
+  const { allEntries, contacts, getLentOutTotal, getYouOweTotal, getTotalNetBalance } =
+    useLendingStore()
 
   const activeBuckets = buckets.filter(b => b.isActive)
   const allSpendingBuckets = buckets.filter(b => b.type === 'spending')
@@ -26,7 +30,7 @@ export function usePulseData() {
   const savingsBuckets = allSavingsBuckets.filter(b => b.isActive && b.showOnHome)
 
   const confirmedSavingIds = getConfirmedSavingsBuckets()
-  const { start } = getMonthRange(monthStartDay)
+  const { start, end } = getMonthRange(monthStartDay)
 
   const spentByBucket: Record<string, number> = {}
   allSpendingBuckets.forEach(b => {
@@ -112,14 +116,24 @@ export function usePulseData() {
     ? spendingPlan - lifestyleSpent - personalDraws + unallocatedAtStart
     : 0
 
+  const lendBorrowMonth = computeMonthMetrics(allEntries, start, end)
+  const lendBorrowCashAdjust = lendBorrowMonth.lendBorrowCashAdjust
+  const adjustedSafeToSpend = safeToSpend + lendBorrowCashAdjust
+  const lentOutstandingThisMonth = lendBorrowMonth.lentOutstandingThisMonth
+
   const unconfirmedSavingsThisMonth = Math.max(0, plannedSavings - confirmedSavedInvested)
 
-  const availableBalance = Math.max(0, safeToSpend) + carriedForwardBalance
-  const monthRemainingBalance = Math.max(0, safeToSpend)
+  const availableBalance = Math.max(0, adjustedSafeToSpend) + carriedForwardBalance
+  const monthRemainingBalance = Math.max(0, adjustedSafeToSpend)
 
   const daysRemaining = getDaysRemaining(monthStartDay)
   const weeksRemaining = Math.max(1, daysRemaining / 7)
-  const weeklyRate = daysRemaining > 0 ? Math.max(0, safeToSpend) / weeksRemaining : 0
+  const weeklyRate =
+    daysRemaining > 0 ? Math.max(0, adjustedSafeToSpend) / weeksRemaining : 0
+
+  const totalNetLending = getTotalNetBalance()
+  const lentOutAsset = getLentOutTotal()
+  const youOweLiability = getYouOweTotal()
 
   const totalSpent = lifestyleSpent
   const monthlySpendAllowance = lifestyleBudget + personalTopUps
@@ -184,9 +198,16 @@ export function usePulseData() {
     effectiveIncome,
     hasSalaryThisMonth,
     availableBalance,
-    safeToSpend,
+    safeToSpend: adjustedSafeToSpend,
+    rawSafeToSpend: safeToSpend,
     monthRemainingBalance,
     carriedForwardBalance,
+    lendBorrowCashAdjust,
+    lentOutstandingThisMonth,
+    totalNetLending,
+    lentOutAsset,
+    youOweLiability,
+    lendingContactCount: contacts.length,
     unallocatedAtStart,
     actualSafeToSpend: safeToSpend,
     safeBeforeInvestments: safeToSpend + confirmedSavedInvested,

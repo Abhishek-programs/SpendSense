@@ -22,6 +22,10 @@ interface YourMoneyCardProps {
 
   breakdown?: { label: string; value: number }[]
 
+  lentOutAsset?: number
+
+  youOweLiability?: number
+
   emptyHint?: string
 
 }
@@ -39,6 +43,10 @@ export function NetWorthCard({
   carriedForwardBalance,
 
   breakdown = [],
+
+  lentOutAsset = 0,
+
+  youOweLiability = 0,
 
   emptyHint,
 
@@ -175,6 +183,50 @@ export function NetWorthCard({
               Confirm savings and add goals in Vault to build your net worth here.
 
             </Text>
+
+          )}
+
+
+
+          {(lentOutAsset > 0 || youOweLiability > 0) && (
+
+            <>
+
+              <View style={styles.divider} />
+
+              {lentOutAsset > 0 && (
+
+                <View style={styles.breakdownRow}>
+
+                  <Text style={styles.breakdownLabel}>Lent out</Text>
+
+                  <Text style={[styles.breakdownValue, { color: colors.savingsSetAside }]}>
+
+                    {formatNPRShort(lentOutAsset)}
+
+                  </Text>
+
+                </View>
+
+              )}
+
+              {youOweLiability > 0 && (
+
+                <View style={styles.breakdownRow}>
+
+                  <Text style={styles.breakdownLabel}>You owe</Text>
+
+                  <Text style={[styles.breakdownValue, { color: colors.red }]}>
+
+                    {formatNPRShort(youOweLiability)}
+
+                  </Text>
+
+                </View>
+
+              )}
+
+            </>
 
           )}
 

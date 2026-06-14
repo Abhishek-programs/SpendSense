@@ -7,7 +7,7 @@ import { migrations } from './migrations'
 const sqlite = openDatabaseSync('spendsense.db', { enableChangeListener: true })
 export const db = drizzle(sqlite, { schema })
 
-const APP_TABLES = ['bucket_balances', 'buckets', 'goals', 'keyword_mappings', 'net_worth_snapshots', 'playbook', 'sure_shot_merchants', 'transactions']
+const APP_TABLES = ['bucket_balances', 'buckets', 'contacts', 'goals', 'keyword_mappings', 'lend_borrow_entries', 'net_worth_snapshots', 'playbook', 'sure_shot_merchants', 'transactions']
 
 type TableInfoRow = { name: string }
 
@@ -150,6 +150,39 @@ export function applySchemaPatches() {
        WHERE \`description\` IS NULL
          AND \`remarks\` IS NOT NULL
          AND \`remarks\` NOT LIKE '__%'`,
+    )
+  }
+
+  const contactsTable = sqlite.getFirstSync(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'`,
+  )
+  if (!contactsTable) {
+    sqlite.execSync(
+      `CREATE TABLE \`contacts\` (
+        \`id\` text PRIMARY KEY NOT NULL,
+        \`name\` text NOT NULL,
+        \`created_at\` text NOT NULL
+      )`,
+    )
+    sqlite.execSync(
+      `CREATE UNIQUE INDEX IF NOT EXISTS \`contacts_name_unique\` ON \`contacts\` (lower(trim(\`name\`)))`,
+    )
+  }
+
+  const lendTable = sqlite.getFirstSync(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='lend_borrow_entries'`,
+  )
+  if (!lendTable) {
+    sqlite.execSync(
+      `CREATE TABLE \`lend_borrow_entries\` (
+        \`id\` text PRIMARY KEY NOT NULL,
+        \`contact_id\` text NOT NULL,
+        \`type\` text NOT NULL,
+        \`amount\` real NOT NULL,
+        \`note\` text,
+        \`date\` text NOT NULL,
+        \`created_at\` text NOT NULL
+      )`,
     )
   }
 }

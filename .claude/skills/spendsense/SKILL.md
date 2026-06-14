@@ -12,7 +12,7 @@ Read **[AGENTS.md](../../../AGENTS.md)** before making changes. It is the single
 - **Logic:** `docs/core-function.md`
 - **UI / features:** `docs/design-and-features.md`
 - **Next tasks:** `BUILD_ORDER.md`
-- **Overlay only:** `docs/overlay-v2.md` — keep overlay changes scoped; don't refactor unrelated modules
+- **Overlay only:** `docs/overlay-v2.md` — native Kotlin in `native/android/screenshotbubble/`; headless OCR in `lib/overlay-headless.ts`
 
 ## Hard rules (summary)
 

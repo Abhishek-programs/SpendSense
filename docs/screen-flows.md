@@ -45,7 +45,7 @@ Nav bar uses glassmorphism — white/translucent background, blurred, floated ab
 7. Settings / Playbook
 8. Onboarding (flow, 6 steps)
 9. Flagged Transaction Prompt (on next open)
-10. Bubble Capture *(V2 — Kotlin overlay scaffold shipped; dev client test pending)*
+10. Bubble Capture *(V2 — Kotlin `screenshotbubble` module shipped; headless JS OCR; dev client test pending)*
 11. Share Receive *(V2 — not in V1)*
 
 ---
@@ -380,11 +380,11 @@ Max 1 notification per day. Quiet hours 10pm–8am. All types individually toggl
 
 ---
 
-## V2 Screens (Not in V1)
+## V2 Screens
 
-### 10. Bubble Capture *(V2)*
+### 10. Bubble Capture *(V2 — shipped; device test pending)*
 
-Floating overlay on whitelisted apps. Requires `SYSTEM_ALERT_WINDOW` + `MediaProjection` permissions. User taps bubble → screenshot captured via MediaProjection → on-device OCR → categorization → notification. User never leaves payment app. Deferred because of native permission complexity.
+Floating overlay on **whitelisted apps only** (eSewa, Khalti, Chrome, …). Requires `SYSTEM_ALERT_WINDOW` + `PACKAGE_USAGE_STATS` + `MediaProjection`. User taps bubble → screenshot (bubble hidden) → Headless JS OCR via `rn-mlkit-ocr` → categorization → save. See [overlay-v2.md](./overlay-v2.md).
 
 ### 11. Share Receive *(V2)*
 

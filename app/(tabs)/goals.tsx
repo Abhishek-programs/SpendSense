@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
+import Animated, { FadeInDown } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { useGoalsStore, type Goal } from '@/store/goals'
@@ -16,6 +18,7 @@ import { suggestSipTarget } from '@/lib/sip-target'
 const EF_PSEUDO_ID = '__ef_goal__'
 
 export default function GoalsScreen() {
+  const insets = useSafeAreaInsets()
   const { goals } = useGoalsStore()
   const { transactions } = useTransactionsStore()
   const { buckets } = useBucketsStore()
@@ -122,7 +125,7 @@ export default function GoalsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Vault</Text>
         <TouchableOpacity
           style={styles.addButton}
@@ -158,24 +161,28 @@ export default function GoalsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Active Goals</Text>
-        {goalsWithStatus.map(goal => (
-          <GoalCard
+        <Text style={styles.sectionTitle}>Active goals</Text>
+        {goalsWithStatus.map((goal, i) => (
+          <Animated.View
             key={goal.id}
-            name={goal.name}
-            current={goal.current}
-            target={goal.targetAmount}
-            monthly={goal.monthlyContribution}
-            color={goal.color}
-            paused={!goal.isEF && goal.isEnabled === false}
-            suggestedTarget={
-              goal.linkedBucketIds.includes(SIP_BUCKET_ID) ? sipSuggestedTarget : null
-            }
-            onPress={() => {
-              setSelectedGoal(goal)
-              setDetailVisible(true)
-            }}
-          />
+            entering={FadeInDown.delay(Math.min(i, 5) * 40).duration(350)}
+          >
+            <GoalCard
+              name={goal.name}
+              current={goal.current}
+              target={goal.targetAmount}
+              monthly={goal.monthlyContribution}
+              color={goal.color}
+              paused={!goal.isEF && goal.isEnabled === false}
+              suggestedTarget={
+                goal.linkedBucketIds.includes(SIP_BUCKET_ID) ? sipSuggestedTarget : null
+              }
+              onPress={() => {
+                setSelectedGoal(goal)
+                setDetailVisible(true)
+              }}
+            />
+          </Animated.View>
         ))}
 
         {completedGoals.length > 0 && (

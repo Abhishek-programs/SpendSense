@@ -1,5 +1,6 @@
-package com.anonymous.SpendSense.overlay
+package com.screenshotbubble
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -9,15 +10,17 @@ import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.view.WindowManager
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.coroutines.resume
 
-class ScreenCaptureManager(
-  private val context: android.content.Context,
-  private val mediaProjection: MediaProjection,
-  private val windowManager: WindowManager,
-) {
+object ScreenCaptureHelper {
 
-  suspend fun capture(): Bitmap? {
+  suspend fun captureToCache(
+    context: Context,
+    mediaProjection: MediaProjection,
+    windowManager: WindowManager,
+  ): String? {
     val metrics = context.resources.displayMetrics
     val width = metrics.widthPixels
     val height = metrics.heightPixels
@@ -28,7 +31,7 @@ class ScreenCaptureManager(
 
     return try {
       virtualDisplay = mediaProjection.createVirtualDisplay(
-        "SpendSenseCapture",
+        "SpendSenseBubbleCapture",
         width,
         height,
         density,
@@ -41,7 +44,8 @@ class ScreenCaptureManager(
       val image = awaitImage(reader) ?: return null
       val bitmap = imageToBitmap(image, width, height)
       image.close()
-      bitmap
+
+      bitmap?.let { saveBitmapToCache(context, it) }
     } finally {
       virtualDisplay?.release()
       reader.close()
@@ -73,6 +77,29 @@ class ScreenCaptureManager(
       Bitmap.Config.ARGB_8888,
     )
     bitmap.copyPixelsFromBuffer(buffer)
-    return Bitmap.createBitmap(bitmap, 0, 0, width, height)
+
+    return if (rowPadding == 0) {
+      bitmap
+    } else {
+      Bitmap.createBitmap(bitmap, 0, 0, width, height).also {
+        if (!bitmap.isRecycled) bitmap.recycle()
+      }
+    }
+  }
+
+  private fun saveBitmapToCache(context: Context, bitmap: Bitmap): String? {
+    val file = File(context.cacheDir, "bubble_capture_${System.currentTimeMillis()}.jpg")
+    return try {
+      FileOutputStream(file).use { out ->
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        out.flush()
+      }
+      file.absolutePath
+    } catch (_: Exception) {
+      if (file.exists()) file.delete()
+      null
+    } finally {
+      if (!bitmap.isRecycled) bitmap.recycle()
+    }
   }
 }

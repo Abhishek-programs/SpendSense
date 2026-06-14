@@ -8,90 +8,139 @@ const {
   AndroidConfig,
 } = require('@expo/config-plugins')
 
-const PACKAGE = 'com.anonymous.SpendSense'
-const OVERLAY_PACKAGE = `${PACKAGE}.overlay`
+const BUBBLE_PACKAGE = 'com.screenshotbubble'
 
-function addOverlayPermissions(manifest) {
+function addBubblePermissions(manifest) {
+  if (!manifest.manifest.$) {
+    manifest.manifest.$ = {}
+  }
+  if (!manifest.manifest.$['xmlns:tools']) {
+    manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools'
+  }
+
   const permissions = [
+    'android.permission.SYSTEM_ALERT_WINDOW',
     'android.permission.FOREGROUND_SERVICE',
     'android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION',
+    {
+      $: {
+        'android:name': 'android.permission.PACKAGE_USAGE_STATS',
+        'tools:ignore': 'ProtectedPermissions',
+      },
+    },
   ]
+
   if (!manifest.manifest['uses-permission']) {
     manifest.manifest['uses-permission'] = []
   }
-  for (const name of permissions) {
-    const exists = manifest.manifest['uses-permission'].some(
-      p => p.$?.['android:name'] === name,
-    )
+
+  for (const perm of permissions) {
+    const name = typeof perm === 'string' ? perm : perm.$['android:name']
+    const exists = manifest.manifest['uses-permission'].some(p => p.$?.['android:name'] === name)
     if (!exists) {
-      manifest.manifest['uses-permission'].push({ $: { 'android:name': name } })
+      manifest.manifest['uses-permission'].push(
+        typeof perm === 'string' ? { $: { 'android:name': perm } } : perm,
+      )
     }
   }
+
   return manifest
 }
 
-function addOverlayService(manifest) {
+function addBubbleServices(manifest) {
   const app = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest)
   app.service = app.service ?? []
-  const serviceName = `.overlay.OverlayService`
-  const exists = app.service.some(s => s.$?.['android:name'] === serviceName)
-  if (!exists) {
-    app.service.push({
+
+  const services = [
+    {
       $: {
-        'android:name': serviceName,
+        'android:name': `${BUBBLE_PACKAGE}.ScreenshotBubbleService`,
         'android:foregroundServiceType': 'mediaProjection',
         'android:exported': 'false',
       },
-    })
+    },
+    {
+      $: {
+        'android:name': `${BUBBLE_PACKAGE}.ScreenshotHeadlessTaskService`,
+        'android:exported': 'false',
+      },
+    },
+  ]
+
+  for (const service of services) {
+    const name = service.$['android:name']
+    const exists = app.service.some(s => s.$?.['android:name'] === name)
+    if (!exists) {
+      app.service.push(service)
+    }
   }
+
   return manifest
 }
 
 function addGradleDependencies(buildGradle) {
-  const deps = [
-    "implementation 'com.google.mlkit:text-recognition:16.0.1'",
-    "implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'",
-    "implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'",
-  ]
-  let contents = buildGradle.contents
-  for (const dep of deps) {
-    if (!contents.includes(dep)) {
-      contents = contents.replace(
-        /dependencies\s*\{/,
-        `dependencies {\n    ${dep}`,
-      )
-    }
+  const dep = "implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'"
+  if (!buildGradle.contents.includes(dep)) {
+    buildGradle.contents = buildGradle.contents.replace(
+      /dependencies\s*\{/,
+      `dependencies {\n    ${dep}`,
+    )
   }
-  buildGradle.contents = contents
   return buildGradle
 }
 
 function patchMainApplication(mainApplication) {
-  const importLine = `import ${OVERLAY_PACKAGE}.OverlayPackage`
-  if (!mainApplication.contents.includes(importLine)) {
-    mainApplication.contents = mainApplication.contents.replace(
-      /^(package .+\n)/m,
-      `$1\n${importLine}\n`,
-    )
+  const importLine = `import ${BUBBLE_PACKAGE}.BubblePackage`
+  let contents = mainApplication.contents
+
+  if (!contents.includes(importLine)) {
+    contents = contents.replace(/^(package .+\n)/m, `$1\n${importLine}\n`)
   }
-  if (!mainApplication.contents.includes('OverlayPackage()')) {
-    mainApplication.contents = mainApplication.contents.replace(
+
+  if (!contents.includes('BubblePackage()')) {
+    contents = contents.replace(
       /(PackageList\(this\)\.packages\.apply\s*\{[^}]*)(}\))/s,
-      `$1      add(OverlayPackage())\n    $2`,
+      `$1      add(BubblePackage())\n    $2`,
     )
-    if (!mainApplication.contents.includes('OverlayPackage()')) {
-      mainApplication.contents = mainApplication.contents.replace(
+    if (!contents.includes('BubblePackage()')) {
+      contents = contents.replace(
         /(val packages = PackageList\(this\)\.packages)/,
-        `$1\n            packages.add(OverlayPackage())`,
+        `$1\n            packages.add(BubblePackage())`,
       )
     }
   }
+
+  mainApplication.contents = contents
   return mainApplication
 }
 
-function copyOverlaySources(projectRoot, platformRoot) {
-  const srcDir = path.join(projectRoot, 'native', 'android', 'overlay')
+function copyBubbleSources(projectRoot, platformRoot) {
+  const srcDir = path.join(projectRoot, 'native', 'android', 'screenshotbubble')
   const destDir = path.join(
+    platformRoot,
+    'app',
+    'src',
+    'main',
+    'java',
+    'com',
+    'screenshotbubble',
+  )
+
+  fs.mkdirSync(destDir, { recursive: true })
+
+  for (const file of fs.readdirSync(destDir)) {
+    if (file.endsWith('.java') || file.endsWith('.kt')) {
+      fs.unlinkSync(path.join(destDir, file))
+    }
+  }
+
+  for (const file of fs.readdirSync(srcDir)) {
+    if (file.endsWith('.kt')) {
+      fs.copyFileSync(path.join(srcDir, file), path.join(destDir, file))
+    }
+  }
+
+  const legacyOverlayDir = path.join(
     platformRoot,
     'app',
     'src',
@@ -102,18 +151,19 @@ function copyOverlaySources(projectRoot, platformRoot) {
     'SpendSense',
     'overlay',
   )
-  fs.mkdirSync(destDir, { recursive: true })
-  for (const file of fs.readdirSync(srcDir)) {
-    if (file.endsWith('.kt')) {
-      fs.copyFileSync(path.join(srcDir, file), path.join(destDir, file))
+  if (fs.existsSync(legacyOverlayDir)) {
+    for (const file of fs.readdirSync(legacyOverlayDir)) {
+      if (file.endsWith('.kt') || file.endsWith('.java')) {
+        fs.unlinkSync(path.join(legacyOverlayDir, file))
+      }
     }
   }
 }
 
 function withSpendSenseOverlay(config) {
   config = withAndroidManifest(config, config => {
-    config.modResults = addOverlayPermissions(config.modResults)
-    config.modResults = addOverlayService(config.modResults)
+    config.modResults = addBubblePermissions(config.modResults)
+    config.modResults = addBubbleServices(config.modResults)
     return config
   })
 
@@ -130,7 +180,7 @@ function withSpendSenseOverlay(config) {
   config = withDangerousMod(config, [
     'android',
     async config => {
-      copyOverlaySources(config.modRequest.projectRoot, config.modRequest.platformProjectRoot)
+      copyBubbleSources(config.modRequest.projectRoot, config.modRequest.platformProjectRoot)
       return config
     },
   ])

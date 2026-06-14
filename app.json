@@ -23,6 +23,9 @@
       },
       "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
+      "androidStatusBar": {
+        "barStyle": "dark-content"
+      },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.SpendSense"
     },

@@ -44,7 +44,7 @@ Copy `.env.example` → `.env`. See `.env.example` for EAS/OCR vars when needed.
 | Database | expo-sqlite + Drizzle (`db/`) |
 | Charts | react-native-gifted-charts |
 | OCR | `rn-mlkit-ocr` on-device — `lib/ocr.ts` + per-app templates in `lib/ocr-templates/`; dev client required |
-| Overlay (V2) | Kotlin in `native/android/overlay/` + `plugins/withSpendSenseOverlay.js` (applied on prebuild) |
+| Overlay (V2) | Kotlin in `native/android/screenshotbubble/` + `plugins/withSpendSenseOverlay.js` (applied on prebuild) |
 | Fonts | Inter via `@expo-google-fonts/inter` |
 
 No tests in V1. No drive-by refactors.
@@ -58,20 +58,22 @@ app/
   _layout.tsx           DB init, font load, store hydration, nudges
   onboarding/           6-step first-launch wizard
   (tabs)/               Home, Transactions, Goals, Settings + center [+]
+  lending/              Person list + per-contact ledger
 
 components/
   ui/                   Card, Chip, ProgressBar
-  home/                 HeroRing, LivingSection, FutureSection, NetWorthCard, …
-  transactions/         TransactionRow, ChartsView, detail sheet
+  home/                 HeroRing, LivingSection, FutureSection, NetWorthCard, LentBorrowRow, …
+  transactions/         TransactionRow, ChartsView, LendingRow, detail sheet
   goals/                GoalCard, AddGoalSheet, GoalDetailSheet
+  lending/              LendBorrowForm, PersonPicker, SettleUpSheet
   manual-entry/         ManualEntrySheet (center [+] button)
   flagged/              FlaggedTransactionPrompt
 
-store/                  Zustand — playbook, buckets, transactions, goals
+store/                  Zustand — playbook, buckets, transactions, goals, lending
 db/                     schema.ts, client.ts, migrations/, seed.ts
-lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, goals/, month-surplus, personal-cap, transaction-label, …
-native/android/overlay/ Kotlin overlay module (source of truth; copied to android/ on prebuild)
-plugins/                withSpendSenseOverlay.js — manifest, gradle, MainApplication, copy overlay sources
+lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, overlay-headless, goals/, …
+native/android/screenshotbubble/  Kotlin bubble overlay + Headless JS OCR bridge
+plugins/                withSpendSenseOverlay.js — manifest, gradle, MainApplication, copy bubble sources
 constants/              colors.ts, defaults.ts (no seeded BigExpense buckets — goals create buckets dynamically)
 components/onboarding/  OnboardingBack (subtle chevron)
 hooks/                  usePulseData.ts, useOverlay.ts
@@ -115,13 +117,13 @@ Never auto-memorize ambiguous merchants.
 
 **Nudges:** max 1/day, quiet 10pm–8am (`lib/notifications.ts`).
 
-**Overlay work:** keep changes scoped to `native/android/overlay/`, `plugins/`, `hooks/useOverlay.ts`. See `docs/overlay-v2.md`.
+**Overlay work:** keep changes scoped to `native/android/screenshotbubble/`, `plugins/withSpendSenseOverlay.js`, `lib/overlay.ts`, `lib/overlay-headless.ts`, `index.js`. See `docs/overlay-v2.md`.
 
 ---
 
 ## V1 scope (short)
 
-**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (Your money + Hero ring), transactions + charts, goals/Vault, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export.
+**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (Your money + Hero ring + Living/Future), lent & borrowed, transactions + charts, goals/Vault, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export.
 
 **Out:** share intent, SMS/email, dark mode, AI chat, iOS, cloud sync. Bubble overlay requires dev client build.
 

@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Keyboard,
   Alert,
+  BackHandler,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -23,6 +24,10 @@ import { processReceiptImage } from '@/lib/ocr'
 import { useBucketsStore, type Bucket } from '@/store/buckets'
 import { usePlaybookStore } from '@/store/playbook'
 import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
+import { useLendingStore } from '@/store/lending'
+import { LendBorrowForm } from '@/components/lending/LendBorrowForm'
+
+type EntryType = 'expense' | 'income' | 'lend_borrow'
 
 interface ManualEntrySheetProps {
   visible: boolean
@@ -35,6 +40,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants, buckets } = useBucketsStore()
   const { fallbackBucketId } = usePlaybookStore()
   const { addTransaction } = useTransactionsStore()
+  const { addEntry: addLendEntry } = useLendingStore()
 
   const spendingBuckets = getSpendingBuckets()
   const savingsBuckets = getSavingsBuckets()
@@ -42,7 +48,9 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
 
   const [mode, setMode] = useState<'manual' | 'scan'>('scan')
   const [amount, setAmount] = useState('')
-  const [isIncome, setIsIncome] = useState(false)
+  const [entryType, setEntryType] = useState<EntryType>('expense')
+  const isIncome = entryType === 'income'
+  const isLendBorrow = entryType === 'lend_borrow'
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [merchant, setMerchant] = useState('')
@@ -53,13 +61,39 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [fromOcr, setFromOcr] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    if (!visible) return
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const showSub = Keyboard.addListener(showEvent, e => {
+      setKeyboardHeight(e.endCoordinates.height)
+    })
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0)
+    })
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
+  }, [visible])
+
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [visible, onClose])
 
   // Reset form when sheet opens
   useEffect(() => {
     if (visible) {
       setMode('scan')
       setAmount('')
-      setIsIncome(false)
+      setEntryType('expense')
       setSelectedBucketId(null)
       setDescription('')
       setMerchant('')
@@ -69,7 +103,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
       setIsRecurring(false)
       setSaving(false)
       setFromOcr(false)
-      setTimeout(() => amountRef.current?.focus(), 300)
+      setKeyboardHeight(0)
     }
   }, [visible])
 
@@ -141,8 +175,13 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.container}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} hitSlop={12}>
@@ -153,14 +192,20 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(40, keyboardHeight > 0 ? keyboardHeight - 80 : 0) },
+            ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
             {/* Mode Toggle */}
+            {!isLendBorrow && (
             <View style={styles.modeToggle}>
               <TouchableOpacity
                 style={[styles.modeButton, mode === 'scan' && styles.modeButtonActive]}
@@ -195,7 +240,55 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                 </Text>
               </TouchableOpacity>
             </View>
+            )}
 
+            {/* Type toggle */}
+            <View style={styles.typeToggle}>
+              <TouchableOpacity
+                style={[styles.typeButton, entryType === 'expense' && styles.typeButtonActive]}
+                onPress={() => setEntryType('expense')}
+              >
+                <Text style={[styles.typeButtonText, entryType === 'expense' && styles.typeButtonTextActive]}>
+                  Expense
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, entryType === 'income' && styles.typeButtonActiveIncome]}
+                onPress={() => setEntryType('income')}
+              >
+                <Text style={[styles.typeButtonText, entryType === 'income' && styles.typeButtonTextActiveIncome]}>
+                  Income
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typeButton, entryType === 'lend_borrow' && styles.typeButtonActiveLend]}
+                onPress={() => {
+                  setEntryType('lend_borrow')
+                  Keyboard.dismiss()
+                }}
+              >
+                <Text style={[styles.typeButtonText, entryType === 'lend_borrow' && styles.typeButtonTextActiveLend]}>
+                  Lend/Borrow
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {isLendBorrow ? (
+              <LendBorrowForm
+                submitLabel="Add entry"
+                onSubmit={async data => {
+                  await addLendEntry({
+                    contactId: data.contactId,
+                    type: data.direction,
+                    amount: data.amount,
+                    note: data.note,
+                    date: data.date,
+                  })
+                  onClose()
+                }}
+              />
+            ) : (
+              <>
             {mode === 'scan' && (
               <View style={styles.scanContainer}>
                 <TouchableOpacity 
@@ -287,26 +380,6 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                 keyboardType="numeric"
                 returnKeyType="done"
               />
-            </View>
-
-            {/* Type toggle */}
-            <View style={styles.typeToggle}>
-              <TouchableOpacity
-                style={[styles.typeButton, !isIncome && styles.typeButtonActive]}
-                onPress={() => setIsIncome(false)}
-              >
-                <Text style={[styles.typeButtonText, !isIncome && styles.typeButtonTextActive]}>
-                  Expense
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.typeButton, isIncome && styles.typeButtonActiveIncome]}
-                onPress={() => setIsIncome(true)}
-              >
-                <Text style={[styles.typeButtonText, isIncome && styles.typeButtonTextActiveIncome]}>
-                  Income
-                </Text>
-              </TouchableOpacity>
             </View>
 
             {/* Bucket selector — hidden for income */}
@@ -407,10 +480,12 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                 <View style={[styles.toggleKnob, isRecurring && styles.toggleKnobActive]} />
               </View>
             </TouchableOpacity>
+              </>
+            )}
           </ScrollView>
 
-          {/* Save button */}
-          <View style={styles.footer}>
+          {!isLendBorrow && (
+          <View style={[styles.footer, keyboardHeight > 0 && { paddingBottom: 12 }]}>
             <TouchableOpacity
               style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
               onPress={handleSave}
@@ -422,6 +497,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
               </Text>
             </TouchableOpacity>
           </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
@@ -578,6 +654,9 @@ const styles = StyleSheet.create({
   typeButtonActiveIncome: {
     backgroundColor: colors.greenFill,
   },
+  typeButtonActiveLend: {
+    backgroundColor: colors.purple + '18',
+  },
   typeButtonText: {
     fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
@@ -588,6 +667,9 @@ const styles = StyleSheet.create({
   },
   typeButtonTextActiveIncome: {
     color: colors.green,
+  },
+  typeButtonTextActiveLend: {
+    color: colors.purple,
   },
   section: {
     marginBottom: 20,

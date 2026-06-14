@@ -10,6 +10,7 @@ import {
   Platform,
   StyleSheet,
   Alert,
+  BackHandler,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -47,6 +48,15 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
       setSaving(false)
     }
   }, [transaction, visible])
+
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [visible, onClose])
 
   if (!transaction) return null
 
@@ -102,7 +112,7 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} hitSlop={12}>

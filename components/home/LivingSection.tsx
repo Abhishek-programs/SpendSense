@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import {
   CORE_LIVING_BUCKET_ID,
   DATES_BUCKET_ID,
@@ -34,12 +35,13 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
     const spent = spentByBucket[bucket.id] ?? 0
     const ratio = bucket.monthlyAmount > 0 ? spent / bucket.monthlyAmount : 0
     return (
-      <View key={bucket.id}>
+      <Animated.View
+        key={bucket.id}
+        entering={FadeInDown.delay(Math.min(i, 4) * 40).duration(350)}
+      >
         {i > 0 && <View style={styles.divider} />}
         <View style={styles.row}>
-          <View style={[styles.iconBg, { backgroundColor: bucket.color + '18' }]}>
-            <Text style={styles.icon}>{bucket.icon}</Text>
-          </View>
+          <Text style={styles.icon}>{bucket.icon}</Text>
           <View style={styles.nameCol}>
             <Text style={styles.name}>{bucket.name}</Text>
             <Text style={styles.sublabel}>
@@ -58,11 +60,11 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
             <ProgressBar value={ratio} height={4} />
           )}
         </View>
-      </View>
+      </Animated.View>
     )
   }
 
-  const renderFundRow = (bucket: Bucket, showDivider: boolean) => {
+  const renderFundRow = (bucket: Bucket, showDivider: boolean, i: number) => {
     const balance = bucketBalances[bucket.id] ?? 0
     const cap = effectiveCap(bucket) ?? bucket.monthlyAmount * 4
     const ratio = cap > 0 ? balance / cap : 0
@@ -70,12 +72,13 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
       balance <= 0 ? colors.red : balance < PERSONAL_LOW_BALANCE ? colors.amber : colors.green
 
     return (
-      <View key={bucket.id}>
+      <Animated.View
+        key={bucket.id}
+        entering={FadeInDown.delay(Math.min(i, 4) * 40).duration(350)}
+      >
         {showDivider && <View style={styles.divider} />}
         <View style={styles.row}>
-          <View style={[styles.iconBg, { backgroundColor: bucket.color + '18' }]}>
-            <Text style={styles.icon}>{bucket.icon}</Text>
-          </View>
+          <Text style={styles.icon}>{bucket.icon}</Text>
           <View style={styles.nameCol}>
             <Text style={styles.name}>{bucket.name}</Text>
             <Text style={styles.sublabel}>
@@ -93,14 +96,14 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
             +{formatNPR(bucket.monthlyAmount)}/mo top-up · rolls over
           </Text>
         </View>
-      </View>
+      </Animated.View>
     )
   }
 
   const allEmpty = regularBuckets.length === 0 && fundBuckets.length === 0
 
   return (
-    <View style={styles.section}>
+    <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Living</Text>
         <Text style={styles.subtitle}>Spending budgets & personal fund</Text>
@@ -108,13 +111,17 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
       <View style={styles.card}>
         {regularBuckets.map((bucket, i) => renderRegularRow(bucket, i))}
         {fundBuckets.map((bucket, i) =>
-          renderFundRow(bucket, regularBuckets.length > 0 || i > 0),
+          renderFundRow(
+            bucket,
+            regularBuckets.length > 0 || i > 0,
+            regularBuckets.length + i,
+          ),
         )}
         {allEmpty && (
           <Text style={styles.empty}>No spending buckets</Text>
         )}
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -155,16 +162,11 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 6,
   },
-  iconBg: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   icon: {
-    fontSize: 16,
+    width: 28,
+    fontSize: 18,
+    marginRight: 12,
+    textAlign: 'center',
   },
   nameCol: {
     flex: 1,

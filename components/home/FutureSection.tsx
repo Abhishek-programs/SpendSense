@@ -1,20 +1,31 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
-import { formatNPR } from '@/lib/format'
+import { formatNPR, formatNPRShort } from '@/lib/format'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 import type { Bucket } from '@/store/buckets'
 import type { FutureGoalGroup } from '@/lib/goals/future-groups'
 import { GOAL_BUCKET_LABELS } from '@/lib/goals/plan'
 import { futureRowLabel } from '@/lib/goals/future-groups'
 
-interface FutureSectionProps {
+interface BucketProgress {
+  current: number
+  target: number
+}
+
+export interface FutureSectionProps {
   goalGroups: FutureGoalGroup[]
   standaloneBuckets: Bucket[]
   confirmedBucketIds: Set<string>
+  progressByBucket?: Record<string, BucketProgress>
+  efBucketId?: string
   showPlaceholder?: boolean
   onConfirm: (bucketId: string) => void
   onAddGoal?: () => void
 }
+
+const EF_ACCENT = '#3B82F6'
 
 function ConfirmRow({
   label,
@@ -23,6 +34,9 @@ function ConfirmRow({
   confirmed,
   onPress,
   indented,
+  progress,
+  icon,
+  accent,
 }: {
   label: string
   hint?: string
@@ -30,7 +44,16 @@ function ConfirmRow({
   confirmed: boolean
   onPress: () => void
   indented?: boolean
+  progress?: BucketProgress
+  icon?: string
+  accent?: string
 }) {
+  const pct =
+    progress && progress.target > 0
+      ? Math.min(progress.current / progress.target, 1)
+      : 0
+  const pctLabel = Math.round(pct * 100)
+
   return (
     <TouchableOpacity
       style={[styles.row, confirmed && styles.rowConfirmed, indented && styles.rowIndented]}
@@ -39,11 +62,31 @@ function ConfirmRow({
       disabled={confirmed}
     >
       <View style={[styles.checkbox, confirmed && styles.checkboxConfirmed]}>
-        {confirmed && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+        {confirmed && (
+          <Animated.View entering={ZoomIn.springify().damping(12)}>
+            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+          </Animated.View>
+        )}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.name, confirmed && styles.nameConfirmed]}>{label}</Text>
+        <View style={styles.labelRow}>
+          {icon && <Text style={styles.rowIcon}>{icon}</Text>}
+          <Text style={[styles.name, confirmed && styles.nameConfirmed]}>{label}</Text>
+        </View>
         {hint && <Text style={styles.hint}>{hint}</Text>}
+        {progress && progress.target > 0 && (
+          <View style={styles.progressWrap}>
+            <ProgressBar
+              value={pct}
+              height={5}
+              mode="fill"
+              color={accent ?? colors.savingsSetAside}
+            />
+            <Text style={styles.progressText}>
+              NPR {formatNPRShort(progress.current)} / {formatNPRShort(progress.target)} · {pctLabel}%
+            </Text>
+          </View>
+        )}
       </View>
       <Text style={[styles.amount, confirmed && styles.amountConfirmed]}>
         NPR {formatNPR(amount)}
@@ -56,6 +99,8 @@ export function FutureSection({
   goalGroups,
   standaloneBuckets,
   confirmedBucketIds,
+  progressByBucket = {},
+  efBucketId,
   showPlaceholder,
   onConfirm,
   onAddGoal,
@@ -64,7 +109,7 @@ export function FutureSection({
     goalGroups.length > 0 || standaloneBuckets.length > 0 || showPlaceholder
 
   return (
-    <View style={styles.section}>
+    <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Future</Text>
         <Text style={styles.subtitle}>Money for later</Text>
@@ -81,6 +126,7 @@ export function FutureSection({
                 })}
                 amount={group.buckets[0].monthlyAmount}
                 confirmed={confirmedBucketIds.has(group.buckets[0].id)}
+                progress={progressByBucket[group.buckets[0].id]}
                 onPress={() => onConfirm(group.buckets[0].id)}
               />
             ) : (
@@ -109,6 +155,7 @@ export function FutureSection({
                         hint={hint}
                         amount={bucket.monthlyAmount}
                         confirmed={confirmedBucketIds.has(bucket.id)}
+                        progress={progressByBucket[bucket.id]}
                         onPress={() => onConfirm(bucket.id)}
                         indented
                       />
@@ -124,17 +171,23 @@ export function FutureSection({
           <View style={styles.divider} />
         )}
 
-        {standaloneBuckets.map((bucket, i) => (
-          <View key={bucket.id}>
-            {i > 0 && <View style={styles.divider} />}
-            <ConfirmRow
-              label={bucket.name}
-              amount={bucket.monthlyAmount}
-              confirmed={confirmedBucketIds.has(bucket.id)}
-              onPress={() => onConfirm(bucket.id)}
-            />
-          </View>
-        ))}
+        {standaloneBuckets.map((bucket, i) => {
+          const isEF = bucket.id === efBucketId
+          return (
+            <View key={bucket.id}>
+              {i > 0 && <View style={styles.divider} />}
+              <ConfirmRow
+                label={bucket.name}
+                amount={bucket.monthlyAmount}
+                confirmed={confirmedBucketIds.has(bucket.id)}
+                progress={progressByBucket[bucket.id]}
+                icon={isEF ? '🛡️' : undefined}
+                accent={isEF ? EF_ACCENT : undefined}
+                onPress={() => onConfirm(bucket.id)}
+              />
+            </View>
+          )
+        })}
 
         {showPlaceholder && onAddGoal && (
           <>
@@ -153,7 +206,7 @@ export function FutureSection({
           <Text style={styles.empty}>No savings buckets</Text>
         )}
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -235,10 +288,28 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: colors.green,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rowIcon: {
+    fontSize: 15,
+  },
   name: {
     fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
+  },
+  progressWrap: {
+    marginTop: 8,
+    gap: 4,
+  },
+  progressText: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
+    fontVariant: ['tabular-nums'],
   },
   hint: {
     fontSize: 11,

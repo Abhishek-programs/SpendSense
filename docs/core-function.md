@@ -37,7 +37,7 @@ Monthly take-home (playbook)
 ## Core loops
 
 ### 1. Capture → categorize → inform
-1. Log via **Manual Entry** (center FAB), **gallery OCR**, or **scan bubble** (dev client)
+1. Log via **Manual Entry** (center FAB), **gallery OCR**, or **scan bubble** (dev client — Kotlin overlay + headless JS OCR)
 2. **Categorization** (priority):
    - Keyword word match in description / remarks / merchant
    - Sure-shot merchant (Settings)
@@ -46,7 +46,7 @@ Monthly take-home (playbook)
 
 ### 2. Month rhythm
 - **Month Start Checklist:** confirm salary (unlocks safe to spend) + savings/investment transfers
-- **Future section:** confirm EF/goals (fixed) or SIP/Shares (editable)
+- **Future section** (bottom of Home): monthly check-off for EF, goals, SIP, Shares via `__savings_confirm__`; each row shows balance vs target and % progress — EF is here, not a separate card above the ring
 - **Month rollover:** Personal top-up + cap; surplus → carried-forward; cap override reset
 
 ### 3. Safe to spend vs available balance
@@ -87,9 +87,28 @@ Only sure-shot merchants are memorized from flagged review.
 
 ---
 
+## Lent & borrowed
+
+Separate from buckets and the transaction ledger's income/expense flow:
+
+- **Lend** — cash left you; reduces safe-to-spend for the month; purple ring slice
+- **Borrow** — cash received; temporarily increases available balance
+- **Settle** — partial or full repayment; not income or expense
+- Per-person net balance; home row shows total net across all people
+
+### Scan bubble (Android)
+
+Separate capture path from manual entry and gallery OCR:
+
+- Foreground Kotlin service with draggable overlay; visible only on whitelisted apps (`UsageStatsManager`)
+- Tap hides bubble → `MediaProjection` screenshot → Headless JS → `processReceiptImage` → same categorize/save rules as OCR
+- Transaction `source: 'overlay'`
+
+---
+
 ## Data storage
 - SQLite + Drizzle, on-device only
-- Zustand: playbook, buckets, transactions, goals
+- Zustand: playbook, buckets, transactions, goals, lending (contacts + lend/borrow entries)
 - Internal remark tokens: `__salary__`, `__savings_confirm__`
 
 ---

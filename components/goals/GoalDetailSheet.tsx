@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Modal,
   View,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  BackHandler,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -31,6 +32,15 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
   const { buckets, loadBuckets } = useBucketsStore()
   const [editingMonthly, setEditingMonthly] = useState(false)
   const [monthlyDraft, setMonthlyDraft] = useState('')
+
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [visible, onClose])
 
   if (!goal) return null
 
@@ -76,7 +86,7 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
   ]
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

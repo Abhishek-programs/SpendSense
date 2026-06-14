@@ -157,7 +157,25 @@ WHERE \`description\` IS NULL
   AND \`remarks\` IS NOT NULL
   AND \`remarks\` NOT LIKE '__%';`
 
+const m0009 = `CREATE TABLE \`contacts\` (
+\`id\` text PRIMARY KEY NOT NULL,
+\`name\` text NOT NULL,
+\`created_at\` text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX \`contacts_name_unique\` ON \`contacts\` (lower(trim(\`name\`)));
+--> statement-breakpoint
+CREATE TABLE \`lend_borrow_entries\` (
+\`id\` text PRIMARY KEY NOT NULL,
+\`contact_id\` text NOT NULL,
+\`type\` text NOT NULL,
+\`amount\` real NOT NULL,
+\`note\` text,
+\`date\` text NOT NULL,
+\`created_at\` text NOT NULL
+);`
+
 export const migrations = {
   journal,
-  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008 },
+  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009 },
 }
