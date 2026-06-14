@@ -32,9 +32,9 @@ import {
   sureShotMerchants as sureShotMerchantsTable,
   bucketBalances as bucketBalancesTable,
   playbook,
+  goals as goalsTable,
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
-import { injectMockData, getDevMockDataPayload } from '@/lib/dev/mock-data'
 import { Overlay, isOverlayAvailable } from '@/lib/overlay'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
@@ -280,7 +280,6 @@ export default function SettingsScreen() {
 
   // Notification toggles — synced to playbook store
   const [nudges, setNudges] = useState(pb.nudgeToggles)
-  const [injecting, setInjecting] = useState(false)
   const [overlayPerm, setOverlayPerm] = useState(false)
   const [bubbleEnabled, setBubbleEnabled] = useState(false)
 
@@ -396,19 +395,6 @@ export default function SettingsScreen() {
     }
   }
 
-  const handleInjectMockData = async () => {
-    setInjecting(true)
-    try {
-      const payload = getDevMockDataPayload()
-      const count = await injectMockData(payload)
-      Alert.alert('Injected', `${count} transactions added from lib/dev/mock-data.json.`)
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not inject mock data')
-    } finally {
-      setInjecting(false)
-    }
-  }
-
   const handleClearAllData = () => {
     Alert.alert(
       'Clear All Data',
@@ -421,6 +407,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await db.delete(transactions)
+              await db.delete(goalsTable)
               await db.delete(bucketBalancesTable)
               await db.delete(netWorthSnapshots)
               await db.delete(keywordMappingsTable)
@@ -490,6 +477,13 @@ export default function SettingsScreen() {
             value={pb.efFloor}
             prefix="NPR "
             onSave={v => pb.updatePlaybook({ efFloor: v })}
+            onSaved={saved.show}
+          />
+          <View style={styles.divider} />
+          <EditableRow
+            label="Your age (optional)"
+            value={pb.userAge ?? 0}
+            onSave={v => pb.updatePlaybook({ userAge: v > 0 ? v : null })}
             onSaved={saved.show}
           />
         </Card>
@@ -950,28 +944,7 @@ export default function SettingsScreen() {
           </>
         )}
 
-        {/* Section 7: Developer */}
-        {__DEV__ && (
-          <>
-            <SectionHeader title="Dev Tools" description="Edit lib/dev/mock-data.json, then inject" />
-            <Card>
-              <Text style={styles.sectionDesc}>
-                Loads mock months from lib/dev/mock-data.json in the repo.
-              </Text>
-              <TouchableOpacity
-                onPress={handleInjectMockData}
-                style={[styles.actionButton, { marginTop: 12 }]}
-                disabled={injecting}
-              >
-                <Text style={styles.actionButtonText}>
-                  {injecting ? 'Injecting…' : 'Inject Mock Data'}
-                </Text>
-              </TouchableOpacity>
-            </Card>
-          </>
-        )}
-
-        <SectionHeader title="Developer" description="Danger zone" />
+        <SectionHeader title="Data" description="Danger zone" />
         <Card>
           <TouchableOpacity onPress={handleClearAllData} style={[styles.actionButton, { borderColor: colors.red }]}>
             <Text style={[styles.actionButtonText, { color: colors.red }]}>Clear All Data</Text>

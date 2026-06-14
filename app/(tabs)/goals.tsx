@@ -10,7 +10,8 @@ import { GoalCard } from '@/components/goals/GoalCard'
 import { GoalDetailSheet } from '@/components/goals/GoalDetailSheet'
 import { AddGoalSheet } from '@/components/goals/AddGoalSheet'
 import { formatNPR } from '@/lib/format'
-import { EF_BUCKET_ID } from '@/constants/defaults'
+import { EF_BUCKET_ID, SIP_BUCKET_ID } from '@/constants/defaults'
+import { suggestSipTarget } from '@/lib/sip-target'
 
 const EF_PSEUDO_ID = '__ef_goal__'
 
@@ -18,7 +19,7 @@ export default function GoalsScreen() {
   const { goals } = useGoalsStore()
   const { transactions } = useTransactionsStore()
   const { buckets } = useBucketsStore()
-  const { efFloor, efStartBalance } = usePlaybookStore()
+  const { efFloor, efStartBalance, userAge, monthlyIncome } = usePlaybookStore()
 
   const [selectedGoal, setSelectedGoal] = useState<(Goal & { current: number; color: string }) | null>(null)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -50,6 +51,8 @@ export default function GoalsScreen() {
         upfrontAmount: null,
         emiTenureMonths: null,
         isEnabled: true,
+        completedAt: null,
+        freedMonthlyAmount: null,
         current: efStartBalance + efContributed,
         color: '#3B82F6',
         isEF: true,
@@ -58,6 +61,7 @@ export default function GoalsScreen() {
 
     // User-created goals: only count __savings_confirm__ transactions as contributions
     goals.forEach(goal => {
+      if (goal.completedAt) return
       const contributed = transactions
         .filter(t =>
           goal.linkedBucketIds.includes(t.bucketId) &&
@@ -76,6 +80,27 @@ export default function GoalsScreen() {
 
     return result
   }, [goals, transactions, buckets, efBucket, efFloor, efStartBalance])
+
+  const completedGoals = useMemo(() => {
+    return goals
+      .filter(g => g.completedAt)
+      .map(goal => {
+        const contributed = transactions
+          .filter(
+            t =>
+              goal.linkedBucketIds.includes(t.bucketId) && t.remarks === '__savings_confirm__',
+          )
+          .reduce((sum, t) => sum + t.amount, 0)
+        const bucket = buckets.find(b => goal.linkedBucketIds.includes(b.id))
+        return {
+          ...goal,
+          current: goal.startBalance + contributed,
+          color: bucket?.color || colors.textMuted,
+        }
+      })
+  }, [goals, transactions, buckets])
+
+  const sipSuggestedTarget = suggestSipTarget(monthlyIncome, userAge)
 
   // Summary calculations
   const totalSaved = goalsWithStatus.reduce((sum, g) => sum + g.current, 0)
@@ -143,12 +168,37 @@ export default function GoalsScreen() {
             monthly={goal.monthlyContribution}
             color={goal.color}
             paused={!goal.isEF && goal.isEnabled === false}
+            suggestedTarget={
+              goal.linkedBucketIds.includes(SIP_BUCKET_ID) ? sipSuggestedTarget : null
+            }
             onPress={() => {
               setSelectedGoal(goal)
               setDetailVisible(true)
             }}
           />
         ))}
+
+        {completedGoals.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Completed</Text>
+            {completedGoals.map(goal => (
+              <GoalCard
+                key={goal.id}
+                name={goal.name}
+                current={goal.current}
+                target={goal.targetAmount}
+                monthly={0}
+                color={goal.color}
+                paused
+                archived
+                onPress={() => {
+                  setSelectedGoal({ ...goal, monthlyContribution: 0 })
+                  setDetailVisible(true)
+                }}
+              />
+            ))}
+          </>
+        )}
 
         {goalsWithStatus.length === 0 && (
           <View style={styles.empty}>

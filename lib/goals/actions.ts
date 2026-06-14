@@ -173,3 +173,15 @@ export async function updateGoalPaymentPlan(
     emiTenureMonths: paymentMode === 'upfront_emi' ? emiTenureMonths : null,
   }).where(eq(goals.id, goalId))
 }
+
+/** Wipe goals + linked buckets before re-saving onboarding drafts (back-nav safe). */
+export async function clearAllGoalsForOnboarding(): Promise<void> {
+  const allGoals = await db.select().from(goals)
+  for (const g of allGoals) {
+    const linkedIds: string[] = JSON.parse(g.linkedBucketIds || '[]')
+    for (const bucketId of linkedIds) {
+      await db.delete(buckets).where(eq(buckets.id, bucketId))
+    }
+    await db.delete(goals).where(eq(goals.id, g.id))
+  }
+}

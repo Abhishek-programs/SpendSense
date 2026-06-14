@@ -13,7 +13,7 @@ import {
 import Slider from '@react-native-community/slider'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 import { addMonths, format } from 'date-fns'
 import { colors } from '@/constants/colors'
 import { useGoalsStore } from '@/store/goals'
@@ -21,6 +21,8 @@ import { useBucketsStore } from '@/store/buckets'
 import { formatNPR } from '@/lib/format'
 import { DEFAULT_MACBOOK_GOAL } from '@/constants/defaults'
 import { OnboardingBack } from '@/components/onboarding/OnboardingBack'
+import { OnboardingShell, useOnboardingFieldScroll } from '@/components/onboarding/OnboardingShell'
+import { clearAllGoalsForOnboarding } from '@/lib/goals/actions'
 import {
   type PaymentMode,
   computeGoalPlan,
@@ -85,6 +87,11 @@ function GoalDraftCard({
   onRemove: () => void
   canRemove: boolean
 }) {
+  const { bindField } = useOnboardingFieldScroll()
+  const nameField = bindField(`${draft.id}-name`)
+  const targetField = bindField(`${draft.id}-target`)
+  const savedField = bindField(`${draft.id}-saved`)
+
   const target = parseFloat(draft.targetAmount) || 0
   const saved = parseFloat(draft.alreadySaved) || 0
   const targetDateObj = parseTargetDate(draft.targetDate, DEFAULT_MACBOOK_GOAL.monthsFromNow)
@@ -94,8 +101,12 @@ function GoalDraftCard({
   const emiTenure = parseInt(draft.emiTenureMonths, 10) || 12
 
   const effectiveMonthly = draft.committedMonthly ?? backCalc
+  const sliderMin =
+    draft.paceApplied && draft.committedMonthly != null ? draft.committedMonthly : backCalc
   const sliderMax = savingsPaceSliderMax(backCalc, Math.max(0, target - saved))
-  const sliderValue = draft.paceApplied ? effectiveMonthly : (draft.sliderMonthly || backCalc)
+  const sliderValue = draft.paceApplied
+    ? (draft.sliderMonthly || draft.committedMonthly || backCalc)
+    : draft.sliderMonthly || backCalc
 
   const previewDate = projectDateFromMonthly(target, saved, sliderValue)
   const currentDateLabel = format(targetDateObj, 'MMM yyyy')
@@ -167,7 +178,7 @@ function GoalDraftCard({
         />
       </View>
 
-      <View style={styles.inputGroup}>
+      <View style={styles.inputGroup} onLayout={nameField.onLayout}>
         <Text style={styles.label}>GOAL NAME</Text>
         <TextInput
           style={styles.textInput}
@@ -175,10 +186,11 @@ function GoalDraftCard({
           onChangeText={v => onChange({ name: v })}
           placeholder="MacBook"
           placeholderTextColor={colors.textMuted}
+          onFocus={nameField.onFocus}
         />
       </View>
 
-      <View style={styles.inputGroup}>
+      <View style={styles.inputGroup} onLayout={targetField.onLayout}>
         <Text style={styles.label}>TARGET AMOUNT</Text>
         <View style={styles.inputWrapper}>
           <Text style={styles.prefix}>NPR</Text>
@@ -187,6 +199,7 @@ function GoalDraftCard({
             value={draft.targetAmount}
             onChangeText={v => onChange({ targetAmount: v, committedMonthly: null, paceApplied: false })}
             keyboardType="numeric"
+            onFocus={targetField.onFocus}
           />
         </View>
       </View>
@@ -202,7 +215,7 @@ function GoalDraftCard({
         />
       </View>
 
-      <View style={styles.inputGroup}>
+      <View style={styles.inputGroup} onLayout={savedField.onLayout}>
         <Text style={styles.label}>ALREADY SAVED</Text>
         <View style={styles.inputWrapper}>
           <Text style={styles.prefix}>NPR</Text>
@@ -213,6 +226,7 @@ function GoalDraftCard({
             keyboardType="numeric"
             placeholder="0"
             placeholderTextColor={colors.textMuted}
+            onFocus={savedField.onFocus}
           />
         </View>
       </View>
@@ -294,11 +308,19 @@ function GoalDraftCard({
           </Text>
           <Text style={styles.paceAmount}>Save NPR {formatNPR(sliderValue)}/mo</Text>
           <Slider
-            minimumValue={backCalc}
+            minimumValue={sliderMin}
             maximumValue={sliderMax}
             step={500}
             value={sliderValue}
-            onValueChange={v => onChange({ sliderMonthly: v, paceApplied: false })}
+            onValueChange={v => {
+              const clamped = Math.max(sliderMin, v)
+              onChange({
+                sliderMonthly: clamped,
+                ...(draft.paceApplied && clamped !== draft.committedMonthly
+                  ? { paceApplied: false }
+                  : {}),
+              })
+            }}
             minimumTrackTintColor={colors.green}
             maximumTrackTintColor={colors.border}
             thumbTintColor={colors.green}
@@ -307,7 +329,8 @@ function GoalDraftCard({
             Reach by {currentDateLabel}
             {sliderValue !== backCalc ? ` → ${previewDateLabel}` : ''}
           </Text>
-          {sliderValue !== effectiveMonthly && (
+          {(!draft.paceApplied || sliderValue !== (draft.committedMonthly ?? backCalc)) &&
+            sliderValue !== backCalc && (
             <TouchableOpacity style={styles.applyBtn} onPress={handleApplyPace}>
               <Text style={styles.applyBtnText}>Apply new pace</Text>
             </TouchableOpacity>
@@ -325,7 +348,7 @@ function GoalDraftCard({
 }
 
 export default function OnboardingGoalsScreen() {
-  const { createGoalWithBuckets } = useGoalsStore()
+  const { createGoalWithBuckets, loadGoals } = useGoalsStore()
   const { loadBuckets } = useBucketsStore()
   const [drafts, setDrafts] = useState<GoalDraft[]>(() => [newGoalDraft()])
 
@@ -345,6 +368,9 @@ export default function OnboardingGoalsScreen() {
   }
 
   const handleNext = async () => {
+    await clearAllGoalsForOnboarding()
+    await loadGoals()
+
     for (const draft of drafts) {
       if (!draft.enabled) continue
       const target = parseFloat(draft.targetAmount) || 0
@@ -370,55 +396,49 @@ export default function OnboardingGoalsScreen() {
       })
     }
     await loadBuckets()
+    await useGoalsStore.getState().loadGoals()
     router.push('/onboarding/buckets')
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <OnboardingShell
+      footer={
+        <TouchableOpacity style={styles.button} onPress={handleNext}>
+          <Text style={styles.buttonText}>Next</Text>
+          <Ionicons name="arrow-forward" size={20} color="#fff" />
+        </TouchableOpacity>
+      }
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <OnboardingBack />
-        <Animated.View entering={FadeInDown.duration(800).delay(200)}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="flag" size={32} color={colors.green} />
-          </View>
-          <Text style={styles.title}>Goals</Text>
-          <Text style={styles.subtitle}>
-            Name your big purchases. We'll figure out how much to save each month.
-          </Text>
-        </Animated.View>
+      <OnboardingBack />
+      <Animated.View entering={FadeInDown.duration(500)}>
+        <View style={styles.iconContainer}>
+          <Ionicons name="flag" size={32} color={colors.green} />
+        </View>
+        <Text style={styles.title}>Goals</Text>
+        <Text style={styles.subtitle}>
+          Name your big purchases. We'll figure out how much to save each month.
+        </Text>
+      </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(800).delay(400)} style={styles.draftsArea}>
-          {drafts.map((draft, i) => (
-            <GoalDraftCard
-              key={draft.id}
-              draft={draft}
-              onChange={patch => updateDraft(draft.id, patch)}
-              onRemove={() => removeDraft(draft.id)}
-              canRemove={drafts.length > 1}
-            />
-          ))}
+      <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.draftsArea}>
+        {drafts.map(draft => (
+          <GoalDraftCard
+            key={draft.id}
+            draft={draft}
+            onChange={patch => updateDraft(draft.id, patch)}
+            onRemove={() => removeDraft(draft.id)}
+            canRemove={drafts.length > 1}
+          />
+        ))}
 
-          {drafts.length < 5 && (
-            <TouchableOpacity style={styles.addGoalBtn} onPress={addDraft}>
-              <Ionicons name="add-circle-outline" size={22} color={colors.green} />
-              <Text style={styles.addGoalText}>Add another big purchase</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-
-        <View style={styles.spacer} />
-
-        <Animated.View entering={FadeInRight.duration(600).delay(600)}>
-          <TouchableOpacity style={styles.button} onPress={handleNext}>
-            <Text style={styles.buttonText}>Next</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
+        {drafts.length < 5 && (
+          <TouchableOpacity style={styles.addGoalBtn} onPress={addDraft}>
+            <Ionicons name="add-circle-outline" size={22} color={colors.green} />
+            <Text style={styles.addGoalText}>Add another big purchase</Text>
           </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        )}
+      </Animated.View>
+    </OnboardingShell>
   )
 }
 

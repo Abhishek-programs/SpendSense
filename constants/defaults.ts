@@ -15,6 +15,7 @@ export const CORE_LIVING_BUCKET_ID = 'core-living'
 export const EF_BUCKET_ID = 'ef'
 export const DATES_BUCKET_ID = 'dates'
 export const FUN_BUCKET_ID = 'fun'
+/** @deprecated Removed bucket — kept for legacy DB rows only */
 export const FOOD_BUCKET_ID = 'food'
 export const PERSONAL_BUCKET_ID = 'personal'
 export const SIP_BUCKET_ID = 'sip'
@@ -50,7 +51,6 @@ export const DEFAULT_BUCKETS: DefaultBucket[] = [
     accumulates: true,
     accumulationCap: 20000,
   },
-  { id: FOOD_BUCKET_ID, name: 'Food', type: 'spending', monthlyAmount: 8000, color: '#F97316', icon: '🍽️' },
   { id: EF_BUCKET_ID, name: 'Emergency Fund', type: 'savings', monthlyAmount: 15000, color: '#3B82F6', icon: '🛡️' },
   { id: SIP_BUCKET_ID, name: 'SIPs', type: 'investment', monthlyAmount: 6000, color: '#10B981', icon: '📈' },
   { id: SHARES_BUCKET_ID, name: 'Direct Shares', type: 'investment', monthlyAmount: 15000, color: '#6366F1', icon: '📊' },
@@ -66,7 +66,6 @@ export const DEFAULT_KEYWORD_MAPPINGS = [
   { keyword: 'core', bucketName: 'Core Living' },
   { keyword: 'fun', bucketName: 'Fun' },
   { keyword: 'date', bucketName: 'Dates' },
-  { keyword: 'food', bucketName: 'Food' },
   { keyword: 'personal', bucketName: 'Personal' },
   { keyword: 'ef', bucketName: 'Emergency Fund' },
   { keyword: 'sip', bucketName: 'SIPs' },

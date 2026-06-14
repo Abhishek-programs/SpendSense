@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   Platform,
   Keyboard,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import Animated, { FadeInDown } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '@/constants/colors'
 import { useBucketsStore, Bucket } from '@/store/buckets'
 import { usePlaybookStore } from '@/store/playbook'
@@ -44,9 +45,10 @@ interface BucketDraft {
 }
 
 export default function OnboardingBucketsScreen() {
-  const { buckets, updateBucket } = useBucketsStore()
+  const { buckets, updateBucket, loadBuckets } = useBucketsStore()
   const { monthlyIncome } = usePlaybookStore()
-  const { goals, setGoalEnabled } = useGoalsStore()
+  const { goals, setGoalEnabled, loadGoals } = useGoalsStore()
+  const insets = useSafeAreaInsets()
 
   const [drafts, setDrafts] = useState<BucketDraft[]>(() =>
     buckets.map(b => ({
@@ -64,6 +66,16 @@ export default function OnboardingBucketsScreen() {
   )
   const [initialized, setInitialized] = useState(false)
   const [keyboardPadding, setKeyboardPadding] = useState(0)
+  const scrollRef = useRef<ScrollView>(null)
+  const fieldOffsets = useRef<Record<string, number>>({})
+
+  const scrollToField = (key: string) => {
+    const y = fieldOffsets.current[key]
+    if (y == null) return
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 48), animated: true })
+    }, Platform.OS === 'ios' ? 250 : 100)
+  }
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -79,6 +91,13 @@ export default function OnboardingBucketsScreen() {
       hide.remove()
     }
   }, [])
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadGoals()
+      void loadBuckets()
+    }, [loadGoals, loadBuckets]),
+  )
 
   const takeHome = monthlyIncome
 
@@ -198,7 +217,13 @@ export default function OnboardingBucketsScreen() {
   )
 
   const renderFundRow = (draft: BucketDraft) => (
-    <View key={draft.id} style={[styles.fundCard, !draft.isActive && styles.bucketRowDisabled]}>
+    <View
+      key={draft.id}
+      style={[styles.fundCard, !draft.isActive && styles.bucketRowDisabled]}
+      onLayout={e => {
+        fieldOffsets.current[`fund-${draft.id}`] = e.nativeEvent.layout.y
+      }}
+    >
       <View style={styles.fundHeader}>
         <Text style={styles.bucketIcon}>{draft.icon}</Text>
         <View style={{ flex: 1 }}>
@@ -225,6 +250,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
             keyboardType="numeric"
             editable={draft.isActive}
+            onFocus={() => scrollToField(`fund-${draft.id}`)}
           />
         </View>
       </View>
@@ -238,6 +264,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { accumulationCap: v })}
             keyboardType="numeric"
             editable={draft.isActive}
+            onFocus={() => scrollToField(`fund-${draft.id}`)}
           />
         </View>
         <Text style={styles.fundFieldSub}>Stop adding when balance reaches this</Text>
@@ -246,7 +273,13 @@ export default function OnboardingBucketsScreen() {
   )
 
   const renderBucketRow = (draft: BucketDraft, subtitle?: string) => (
-    <View key={draft.id} style={[styles.bucketRow, !draft.isActive && styles.bucketRowDisabled]}>
+    <View
+      key={draft.id}
+      style={[styles.bucketRow, !draft.isActive && styles.bucketRowDisabled]}
+      onLayout={e => {
+        fieldOffsets.current[`bucket-${draft.id}`] = e.nativeEvent.layout.y
+      }}
+    >
       <Text style={styles.bucketIcon}>{draft.icon}</Text>
       <View style={styles.bucketInfo}>
         <Text style={[styles.bucketName, !draft.isActive && styles.textDisabled]}>
@@ -263,6 +296,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
             keyboardType="numeric"
             editable={draft.isActive}
+            onFocus={() => scrollToField(`bucket-${draft.id}`)}
           />
         </View>
       </View>
@@ -328,6 +362,7 @@ export default function OnboardingBucketsScreen() {
                           onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
                           keyboardType="numeric"
                           editable={draft.isActive}
+                          onFocus={() => scrollToField(`bucket-${draft.id}`)}
                         />
                       </View>
                     </View>
@@ -347,10 +382,10 @@ export default function OnboardingBucketsScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
-      <View style={styles.meter}>
+      <View style={[styles.meter, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
         <View style={styles.meterTop}>
           <OnboardingBack />
           <Text style={styles.meterTitle}>Bucket Builder</Text>
@@ -374,10 +409,12 @@ export default function OnboardingBucketsScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + keyboardPadding }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.subtitle}>
           Allocate your take-home across spending and savings. Core Living and EF are locked.
@@ -396,7 +433,7 @@ export default function OnboardingBucketsScreen() {
         </Animated.View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity
           style={[styles.button, overAllocated && styles.buttonDisabled]}
           onPress={handleNext}
@@ -417,7 +454,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: 16,
-    paddingTop: 48,
     paddingBottom: 16,
     gap: 6,
   },
@@ -625,8 +661,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    paddingBottom: 28,
+    paddingTop: 12,
     backgroundColor: colors.pageBg,
     borderTopWidth: 1,
     borderTopColor: colors.border,

@@ -29,6 +29,7 @@ export function useOverlay() {
         }
 
         const { bucketId, isFlagged } = categorize({
+          description: null,
           remarks: parsed.remarks,
           merchant: parsed.merchant,
           keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
@@ -39,11 +40,12 @@ export function useOverlay() {
         await addTransaction({
           type: 'expense',
           amount: parsed.amount,
+          description: null,
           merchant: parsed.merchant,
           bucketId,
           date: new Date(timestamp).toISOString(),
           source: 'overlay',
-          remarks: parsed.remarks,
+          remarks: parsed.remarks ?? parsed.merchant ?? null,
           parsedTxnId: parsed.txnId,
           isFlagged,
           isRecurringDraft: false,

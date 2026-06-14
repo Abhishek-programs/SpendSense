@@ -11,7 +11,9 @@ interface FutureSectionProps {
   goalGroups: FutureGoalGroup[]
   standaloneBuckets: Bucket[]
   confirmedBucketIds: Set<string>
+  showPlaceholder?: boolean
   onConfirm: (bucketId: string) => void
+  onAddGoal?: () => void
 }
 
 function ConfirmRow({
@@ -54,9 +56,12 @@ export function FutureSection({
   goalGroups,
   standaloneBuckets,
   confirmedBucketIds,
+  showPlaceholder,
   onConfirm,
+  onAddGoal,
 }: FutureSectionProps) {
-  const hasContent = goalGroups.length > 0 || standaloneBuckets.length > 0
+  const hasContent =
+    goalGroups.length > 0 || standaloneBuckets.length > 0 || showPlaceholder
 
   return (
     <View style={styles.section}>
@@ -130,6 +135,19 @@ export function FutureSection({
             />
           </View>
         ))}
+
+        {showPlaceholder && onAddGoal && (
+          <>
+            {(goalGroups.length > 0 || standaloneBuckets.length > 0) && (
+              <View style={styles.divider} />
+            )}
+            <TouchableOpacity style={styles.placeholderRow} onPress={onAddGoal}>
+              <Ionicons name="add-circle-outline" size={22} color={colors.green} />
+              <Text style={styles.placeholderText}>Plan a future big spend</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          </>
+        )}
 
         {!hasContent && (
           <Text style={styles.empty}>No savings buckets</Text>
@@ -247,5 +265,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     textAlign: 'center',
+  },
+  placeholderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  placeholderText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green,
   },
 })

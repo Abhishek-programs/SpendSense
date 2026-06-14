@@ -40,6 +40,12 @@ export interface Bucket {
 
   accumulationCap?: number | null
 
+  capOverride?: number | null
+
+  capOverrideReason?: 'general' | 'purchase' | null
+
+  capOverridePurchaseAmount?: number | null
+
 }
 
 
@@ -150,6 +156,12 @@ export const useBucketsStore = create<BucketsState>((set, get) => ({
 
         accumulationCap: b.accumulationCap ?? null,
 
+        capOverride: b.capOverride ?? null,
+
+        capOverrideReason: (b.capOverrideReason as Bucket['capOverrideReason']) ?? null,
+
+        capOverridePurchaseAmount: b.capOverridePurchaseAmount ?? null,
+
       })),
 
       bucketBalances: balances,
@@ -203,6 +215,12 @@ export const useBucketsStore = create<BucketsState>((set, get) => ({
       accumulates: bucket.accumulates ?? false,
 
       accumulationCap: bucket.accumulationCap ?? null,
+
+      capOverride: bucket.capOverride ?? null,
+
+      capOverrideReason: bucket.capOverrideReason ?? null,
+
+      capOverridePurchaseAmount: bucket.capOverridePurchaseAmount ?? null,
 
     })
 

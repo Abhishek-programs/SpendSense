@@ -1,6 +1,6 @@
 # Build Order
 
-What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md). For screen specs see [docs/screen-flows.md](./docs/screen-flows.md). Master plan: [.cursor/plans/spendsense_flow_alignment_d489d75a.plan.md](./.cursor/plans/spendsense_flow_alignment_d489d75a.plan.md).
+What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md). For behavior and UI see [docs/core-function.md](./docs/core-function.md) and [docs/design-and-features.md](./docs/design-and-features.md).
 
 ---
 
@@ -8,25 +8,20 @@ What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md)
 
 | Area | Status |
 |---|---|
-| DB + Drizzle + seed + migrations (incl. `0005` goal payment mode) | Done |
-| Goal payment UX — Pay upfront / EMI reserve, per-goal buckets | Done |
-| Zustand stores + root hydration | Done |
-| 6-step onboarding (Foundations → Goals → Bucket Builder) | Done |
-| Home — dual safe-to-spend HeroRing, MetricPills, EFGoalCard | Done |
-| Net worth from EF start + goal startBalance | Done |
-| SIP fixed confirm + Shares editable ShareConfirmSheet | Done |
-| Dev mock-data inject (`__DEV__` in Settings) | Done |
-| Gallery OCR — `rn-mlkit-ocr`, `lib/ocr.ts`, per-app templates in `lib/ocr-templates/` | Done |
-| ManualEntrySheet OCR pre-fill + bucket pre-select + `source: 'ocr'` | Done |
-| Transaction source badges (OCR / Bubble / eSewa / Khalti when detectable) | Done |
-| Overlay — Kotlin module (`native/android/overlay/`) + config plugin + TS layer | Done |
-| `eas.json` development profile for dev client builds | Done |
-| Manual entry + center [+] FAB | Done |
-| Categorization (3-step) + flagged prompt | Done |
-| Transactions list, detail sheet, charts | Done |
-| Goals + EF pseudo-goal + projections | Done |
-| Month start checklist | Done |
-| Notifications + settings toggles | Done |
+| DB + Drizzle + seed + migrations (through `m0008` description column) | Done |
+| Zustand stores + root hydration + month rollover / surplus carry-forward | Done |
+| 6-step onboarding (Foundations → Goals → Bucket Builder → Balances) | Done |
+| Home — Your money card, Hero ring v2, Living / Future sections, EF card | Done |
+| Salary-gated safe to spend (checklist unlocks ring for the month) | Done |
+| Personal accumulating fund + cap prompts | Done |
+| Goal completion → Vault archived + reallocation prompt | Done |
+| Month start checklist with undo confirmation | Done |
+| Manual entry — description / merchant fields, word-based categorize | Done |
+| Gallery OCR + overlay bubble (dev client) | Done |
+| Transactions ledger + charts + detail sheet | Done |
+| Vault — active / completed goals, SIP age-based target hint | Done |
+| Settings — playbook, buckets, keywords, notifications, CSV export | Done |
+| Docs — `core-function.md`, `design-and-features.md` | Done |
 
 ---
 
@@ -34,23 +29,22 @@ What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md)
 
 ### OCR
 
-- [ ] EAS dev client build: `eas build --profile development --platform android`
-- [ ] Test gallery scan with real eSewa/Khalti receipts; iterate templates in `lib/ocr-templates/`
+- [ ] EAS dev client: `eas build --profile development --platform android`
+- [ ] Gallery scan with real eSewa/Khalti receipts; tune `lib/ocr-templates/`
 
-### Overlay V2
+### Overlay
 
-- [ ] Dev client build (same profile — includes overlay native module)
+- [ ] Dev client build (includes native overlay module)
 - [ ] Grant draw-over + screen capture in Settings → Scan Bubble
-- [ ] Tap bubble over banking app → silent save + toast
-- [ ] Flagged transactions review flow
+- [ ] Bubble capture → silent save + toast; flagged review flow
 
 ### Polish
 
-- [ ] Geist Mono fonts per design.md (optional)
+- [ ] Geist Mono fonts per `docs/design.md` (optional)
 - [ ] Auto-create recurring drafts on month start (PRD F5)
 
 ---
 
 ## Exploratory (no timeline)
 
-AI insights layer in `ai/` — tap-triggered only, no chat. Needs 3+ months of real data first.
+AI insights in `ai/` — tap-triggered only, no chat. Needs 3+ months of real data first.

@@ -8,6 +8,7 @@ import {
   isAccumulatingExpense,
   restoreToAccumulatingBucket,
 } from '@/lib/bucket-balance'
+import { clearPersonalCapOverrideIfNeeded } from '@/lib/personal-cap'
 import { useBucketsStore } from '@/store/buckets'
 
 export const INCOME_BUCKET_ID = '_income'
@@ -17,6 +18,7 @@ export interface Transaction {
   type: 'expense' | 'income'
   amount: number
   merchant: string | null
+  description: string | null
   bucketId: string
   date: string
   source: 'manual' | 'ocr' | 'overlay'
@@ -80,18 +82,17 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
       isAccumulatingExpense(txn.remarks)
     ) {
       const result = await deductFromAccumulatingBucket(bucket.id, txn.amount)
-      await useBucketsStore.getState().refreshBalances()
+      await clearPersonalCapOverrideIfNeeded(txn.amount, bucket)
+      await useBucketsStore.getState().loadBuckets()
       if (result.overspent > 0) {
         overspent = result.overspent
       }
     }
 
     const state = get()
-    if (state.transactions.length > 0 || state.isLoaded) {
-      const allTxns = [...state.transactions, row]
-      const flagged = allTxns.filter(t => t.isFlagged)
-      set({ transactions: allTxns, flaggedTransactions: flagged })
-    }
+    const allTxns = [...state.transactions, row]
+    const flagged = allTxns.filter(t => t.isFlagged)
+    set({ transactions: allTxns, flaggedTransactions: flagged, isLoaded: true })
 
     return { overspent }
   },
@@ -100,6 +101,7 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     const updateData: Record<string, any> = {}
     if (patch.amount !== undefined) updateData.amount = patch.amount
     if (patch.merchant !== undefined) updateData.merchant = patch.merchant
+    if (patch.description !== undefined) updateData.description = patch.description
     if (patch.bucketId !== undefined) updateData.bucketId = patch.bucketId
     if (patch.remarks !== undefined) updateData.remarks = patch.remarks
     if (patch.isFlagged !== undefined) updateData.isFlagged = patch.isFlagged
@@ -132,6 +134,7 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
           bucket.id,
           txn.amount,
           bucket.accumulationCap,
+          bucket,
         )
         await useBucketsStore.getState().refreshBalances()
       }
@@ -154,7 +157,12 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
   getConfirmedSavingsBuckets: () => {
     const confirmedIds = new Set<string>()
     get().transactions.forEach(t => {
-      if (!t.isFlagged && !t.isRecurringDraft && t.type === 'expense') {
+      if (
+        !t.isFlagged &&
+        !t.isRecurringDraft &&
+        t.type === 'expense' &&
+        t.remarks === '__savings_confirm__'
+      ) {
         confirmedIds.add(t.bucketId)
       }
     })
@@ -195,6 +203,7 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     await get().addTransaction({
       type: 'income',
       amount: salary,
+      description: 'Salary received',
       merchant: 'Salary',
       bucketId: INCOME_BUCKET_ID,
       date: salaryDate.toISOString(),

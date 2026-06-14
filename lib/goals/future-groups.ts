@@ -1,7 +1,10 @@
+import { EF_BUCKET_ID, SHARES_BUCKET_ID, SIP_BUCKET_ID } from '@/constants/defaults'
 import type { Bucket } from '@/store/buckets'
 import type { Goal } from '@/store/goals'
 import type { PaymentMode } from '@/lib/goals/plan'
 import { GOAL_BUCKET_LABELS } from '@/lib/goals/plan'
+
+const SYSTEM_BUCKET_IDS = new Set([EF_BUCKET_ID, SIP_BUCKET_ID, SHARES_BUCKET_ID])
 
 export interface FutureGoalGroup {
   goalId: string
@@ -13,11 +16,11 @@ export interface FutureGoalGroup {
 export function buildFutureGroups(
   savingsBuckets: Bucket[],
   goals: Goal[],
-): { goalGroups: FutureGoalGroup[]; standaloneBuckets: Bucket[] } {
+): { goalGroups: FutureGoalGroup[]; standaloneBuckets: Bucket[]; hasBigSpendGoal: boolean } {
   const goalGroups: FutureGoalGroup[] = []
   const linkedIds = new Set<string>()
 
-  for (const goal of goals.filter(g => g.isEnabled)) {
+  for (const goal of goals.filter(g => g.isEnabled && !g.completedAt)) {
     const goalBuckets = savingsBuckets.filter(b => b.linkedGoalId === goal.id)
     if (goalBuckets.length === 0) continue
     goalBuckets.forEach(b => linkedIds.add(b.id))
@@ -30,7 +33,15 @@ export function buildFutureGroups(
   }
 
   const standaloneBuckets = savingsBuckets.filter(b => !linkedIds.has(b.id))
-  return { goalGroups, standaloneBuckets }
+
+  const hasBigSpendGoal = goals.some(
+    g =>
+      g.isEnabled &&
+      !g.completedAt &&
+      !g.linkedBucketIds.some(id => SYSTEM_BUCKET_IDS.has(id)),
+  )
+
+  return { goalGroups, standaloneBuckets, hasBigSpendGoal }
 }
 
 export function futureRowLabel(

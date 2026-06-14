@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 20,
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   loadingBox: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 40,

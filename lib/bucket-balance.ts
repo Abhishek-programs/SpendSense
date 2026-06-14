@@ -1,8 +1,16 @@
 import { eq } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { bucketBalances, buckets } from '@/db/schema'
+import { PERSONAL_BUCKET_ID } from '@/constants/defaults'
 import { getMonthRange } from '@/lib/month'
 import type { Bucket } from '@/store/buckets'
+
+export function effectiveCap(bucket: Bucket): number | null {
+  if (bucket.capOverride != null && bucket.capOverride > 0) {
+    return bucket.capOverride
+  }
+  return bucket.accumulationCap ?? null
+}
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -69,23 +77,26 @@ export async function restoreToAccumulatingBucket(
   bucketId: string,
   amount: number,
   cap: number | null | undefined,
+  bucket?: Bucket,
 ): Promise<void> {
+  const effective = bucket ? effectiveCap(bucket) : cap
   const current = await getBucketBalance(bucketId)
   let next = current + amount
-  if (cap != null && cap > 0) {
-    next = Math.min(next, cap)
+  if (effective != null && effective > 0) {
+    next = Math.min(next, effective)
   }
   await setBucketBalance(bucketId, next)
 }
 
 export async function applyTopUp(bucket: Bucket): Promise<number> {
+  const cap = effectiveCap(bucket)
   const current = await getBucketBalance(bucket.id)
-  if (bucket.accumulationCap != null && current >= bucket.accumulationCap) {
+  if (cap != null && current >= cap) {
     return current
   }
   let next = current + bucket.monthlyAmount
-  if (bucket.accumulationCap != null && bucket.accumulationCap > 0) {
-    next = Math.min(next, bucket.accumulationCap)
+  if (cap != null && cap > 0) {
+    next = Math.min(next, cap)
   }
   await setBucketBalance(bucket.id, next)
   return next
@@ -115,6 +126,18 @@ export async function runMonthRollover(
   const allBuckets = await db.select().from(buckets)
   for (const bucket of allBuckets) {
     if (!bucket.accumulates || !bucket.isActive) continue
+
+    if (bucket.id === PERSONAL_BUCKET_ID) {
+      await db
+        .update(buckets)
+        .set({
+          capOverride: null,
+          capOverrideReason: null,
+          capOverridePurchaseAmount: null,
+        })
+        .where(eq(buckets.id, PERSONAL_BUCKET_ID))
+    }
+
     await ensureBalanceRow(bucket.id)
     await applyTopUp({
       id: bucket.id,
@@ -128,10 +151,24 @@ export async function runMonthRollover(
       showOnHome: bucket.showOnHome,
       accumulates: true,
       accumulationCap: bucket.accumulationCap ?? null,
+      capOverride: bucket.id === PERSONAL_BUCKET_ID ? null : (bucket.capOverride ?? null),
+      capOverrideReason: null,
+      capOverridePurchaseAmount: null,
     })
   }
 
   return monthKey
+}
+
+export async function clearPersonalCapOverride(): Promise<void> {
+  await db
+    .update(buckets)
+    .set({
+      capOverride: null,
+      capOverrideReason: null,
+      capOverridePurchaseAmount: null,
+    })
+    .where(eq(buckets.id, PERSONAL_BUCKET_ID))
 }
 
 export function isAccumulatingExpense(remarks: string | null | undefined): boolean {

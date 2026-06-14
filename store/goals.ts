@@ -17,6 +17,8 @@ export interface Goal {
   upfrontAmount: number | null
   emiTenureMonths: number | null
   isEnabled: boolean
+  completedAt?: string | null
+  freedMonthlyAmount?: number | null
   createdAt: string
 }
 
@@ -41,6 +43,8 @@ function mapGoalRow(g: typeof goals.$inferSelect): Goal {
     upfrontAmount: g.upfrontAmount ?? null,
     emiTenureMonths: g.emiTenureMonths ?? null,
     isEnabled: g.isEnabled ?? true,
+    completedAt: g.completedAt ?? null,
+    freedMonthlyAmount: g.freedMonthlyAmount ?? null,
   }
 }
 
@@ -104,6 +108,8 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     if (patch.upfrontAmount !== undefined) updateData.upfrontAmount = patch.upfrontAmount
     if (patch.emiTenureMonths !== undefined) updateData.emiTenureMonths = patch.emiTenureMonths
     if (patch.isEnabled !== undefined) updateData.isEnabled = patch.isEnabled
+    if (patch.completedAt !== undefined) updateData.completedAt = patch.completedAt
+    if (patch.freedMonthlyAmount !== undefined) updateData.freedMonthlyAmount = patch.freedMonthlyAmount
     await db.update(goals).set(updateData).where(eq(goals.id, id))
     await get().loadGoals()
   },

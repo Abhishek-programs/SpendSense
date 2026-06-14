@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { usePulseData } from '@/hooks/usePulseData'
@@ -17,7 +18,16 @@ import { useBucketsStore } from '@/store/buckets'
 import { useGoalsStore } from '@/store/goals'
 import { buildFutureGroups, checklistLabel } from '@/lib/goals/future-groups'
 
-import { SHARES_BUCKET_ID, SIP_BUCKET_ID, EF_BUCKET_ID } from '@/constants/defaults'
+import {
+  SHARES_BUCKET_ID,
+  SIP_BUCKET_ID,
+  EF_BUCKET_ID,
+  PERSONAL_BUCKET_ID,
+} from '@/constants/defaults'
+import { currentMonthKey } from '@/lib/bucket-balance'
+import { isPersonalAtCap } from '@/lib/personal-cap'
+import { checkAndCompleteGoals } from '@/lib/goals/completion'
+import { PersonalCapPrompt } from '@/components/home/PersonalCapPrompt'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -27,9 +37,9 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen() {
-  const { transactions } = useTransactionsStore()
+  const { transactions, deleteTransaction } = useTransactionsStore()
   const { buckets } = useBucketsStore()
-  const { goals } = useGoalsStore()
+  const { goals, loadGoals } = useGoalsStore()
   const {
     userName,
     monthStartDay,
@@ -40,29 +50,26 @@ export default function HomeScreen() {
   } = usePlaybookStore()
   const {
     totalIncome,
-    actualSafeToSpend,
-    safeBeforeInvestments,
-    plannedSavings,
+    effectiveIncome,
+    safeToSpend,
+    availableBalance,
+    monthRemainingBalance,
+    carriedForwardBalance,
+    confirmedSavedInvested,
     flaggedAmount,
-    confirmedSavings,
-    stillToSave,
-    stillToInvest,
+    unconfirmedSavingsThisMonth,
     lifestyleSpent,
+    personalDraws,
     bucketBalances,
     daysRemaining,
     weeklyRate,
-    totalSpent,
     spendingBuckets,
     savingsBuckets,
     spentByBucket,
     confirmedSavingIds,
     monthStart,
     addTransaction,
-    netWorth,
-    monthGrowth,
-    totalAssets,
-    totalLiabilities,
-    savingsRate,
+    intentionalSavings,
     assetBreakdown,
     hasAnyData,
     efValue,
@@ -72,10 +79,12 @@ export default function HomeScreen() {
   const [checklistVisible, setChecklistVisible] = useState(false)
   const [shareSheetVisible, setShareSheetVisible] = useState(false)
   const [shareBucketId, setShareBucketId] = useState<string | null>(null)
+  const [capPromptVisible, setCapPromptVisible] = useState(false)
+  const [capPromptMode, setCapPromptMode] = useState<'cap_hit' | 'idle_rebalance'>('cap_hit')
 
   const flagged = transactions.filter(t => t.isFlagged)
 
-  const currentMonthKey = new Date().toISOString().slice(0, 7)
+  const monthKey = currentMonthKey(monthStartDay)
 
   // Determine which checklist items are already completed this month
   // by checking if matching transactions exist
@@ -104,21 +113,19 @@ export default function HomeScreen() {
   }, [monthlyIncome, savingsBuckets, hasSalaryThisMonth, confirmedSavingIds, goals])
 
   const checklistAllDone = checklistItems.every(i => i.completed)
-  const checklistPending = lastChecklistMonth !== currentMonthKey && !checklistAllDone
+  const checklistPending = lastChecklistMonth !== monthKey && !checklistAllDone
 
-  // Show checklist on first open if month hasn't been completed
   useEffect(() => {
-    if (lastChecklistMonth !== currentMonthKey && !checklistAllDone) {
+    if (lastChecklistMonth !== monthKey && !checklistAllDone) {
       setChecklistVisible(true)
     }
-  }, [lastChecklistMonth, currentMonthKey])
+  }, [lastChecklistMonth, monthKey])
 
-  // When all items are done, mark the month as complete
   useEffect(() => {
-    if (checklistAllDone && lastChecklistMonth !== currentMonthKey) {
-      updatePlaybook({ lastChecklistMonth: currentMonthKey })
+    if (checklistAllDone && lastChecklistMonth !== monthKey) {
+      updatePlaybook({ lastChecklistMonth: monthKey })
     }
-  }, [checklistAllDone, currentMonthKey, lastChecklistMonth])
+  }, [checklistAllDone, monthKey, lastChecklistMonth])
 
   const handleToggleChecklistItem = async (id: string) => {
     const txnDate = monthStart.toISOString()
@@ -127,6 +134,7 @@ export default function HomeScreen() {
       await addTransaction({
         type: 'income',
         amount: monthlyIncome,
+        description: 'Salary received',
         merchant: 'Salary',
         bucketId: INCOME_BUCKET_ID,
         date: txnDate,
@@ -142,6 +150,7 @@ export default function HomeScreen() {
       await addTransaction({
         type: 'expense',
         amount: bucket.monthlyAmount,
+        description: bucket.name,
         merchant: bucket.name,
         bucketId: bucket.id,
         date: txnDate,
@@ -158,10 +167,13 @@ export default function HomeScreen() {
     const bucket = savingsBuckets.find(b => b.id === bucketId)
     if (!bucket || confirmedSavingIds.has(bucketId)) return
 
-    const isShares =
-      bucket.id === SHARES_BUCKET_ID || bucket.name === 'Direct Shares'
+    const isEditable =
+      bucket.id === SHARES_BUCKET_ID ||
+      bucket.id === SIP_BUCKET_ID ||
+      bucket.name === 'Direct Shares' ||
+      bucket.name === 'SIPs'
 
-    if (isShares) {
+    if (isEditable) {
       setShareBucketId(bucketId)
       setShareSheetVisible(true)
       return
@@ -170,6 +182,7 @@ export default function HomeScreen() {
     await addTransaction({
       type: 'expense',
       amount: bucket.monthlyAmount,
+      description: bucket.name,
       merchant: bucket.name,
       bucketId: bucket.id,
       date: new Date().toISOString(),
@@ -188,6 +201,7 @@ export default function HomeScreen() {
     await addTransaction({
       type: 'expense',
       amount,
+      description: bucket.name,
       merchant: bucket.name,
       bucketId: bucket.id,
       date: new Date().toISOString(),
@@ -205,10 +219,65 @@ export default function HomeScreen() {
     ? savingsBuckets.find(b => b.id === shareBucketId)
     : null
 
-  const { goalGroups, standaloneBuckets } = useMemo(
+  const { goalGroups, standaloneBuckets, hasBigSpendGoal } = useMemo(
     () => buildFutureGroups(savingsBuckets, goals),
     [savingsBuckets, goals],
   )
+
+  const personalBucket = buckets.find(b => b.id === PERSONAL_BUCKET_ID)
+  const personalBalance = personalBucket ? (bucketBalances[personalBucket.id] ?? 0) : 0
+
+  useEffect(() => {
+    if (!personalBucket) return
+    isPersonalAtCap(personalBucket).then(atCap => {
+      if (atCap && !personalBucket.capOverride) {
+        setCapPromptMode('cap_hit')
+        setCapPromptVisible(true)
+      }
+    })
+  }, [personalBucket?.id, personalBalance])
+
+  useEffect(() => {
+    checkAndCompleteGoals(goals, transactions).then(completed => {
+      if (completed.length > 0) {
+        loadGoals()
+        useBucketsStore.getState().loadBuckets()
+        const last = completed[completed.length - 1]
+        Alert.alert(
+          'Goal completed!',
+          `"${last.goal.name}" is fully funded. Create a new big spend goal and redirect NPR ${last.freedMonthlyAmount.toLocaleString()}/mo?`,
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Create goal',
+              onPress: () => router.push('/(tabs)/goals'),
+            },
+          ],
+        )
+      }
+    })
+  }, [transactions, goals])
+
+  const handleUndoChecklistItem = (id: string) => {
+    Alert.alert('Undo confirmation?', 'This will remove the logged transaction for this item.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Undo',
+        style: 'destructive',
+        onPress: async () => {
+          if (id === 'income') {
+            const txn = transactions.find(t => t.remarks === '__salary__' && t.type === 'income')
+            if (txn) await deleteTransaction(txn.id)
+          } else {
+            const txn = transactions.find(
+              t => t.bucketId === id && t.remarks === '__savings_confirm__',
+            )
+            if (txn) await deleteTransaction(txn.id)
+          }
+        },
+      },
+    ])
+  }
 
   return (
     <View style={styles.container}>
@@ -269,13 +338,12 @@ export default function HomeScreen() {
 
         {/* Net Worth Card */}
         <NetWorthCard
-          netWorth={netWorth}
-          monthGrowth={monthGrowth}
-          assets={totalAssets}
-          liabilities={totalLiabilities}
-          savingsRate={savingsRate}
+          availableBalance={availableBalance}
+          intentionalSavings={intentionalSavings}
+          monthRemainingBalance={monthRemainingBalance}
+          carriedForwardBalance={carriedForwardBalance}
           breakdown={assetBreakdown.map(a => ({ label: a.name, value: a.value }))}
-          emptyHint={!hasAnyData ? 'Your plan is live — net worth builds from here' : undefined}
+          emptyHint={!hasAnyData ? 'Your plan is live — savings build from here' : undefined}
         />
 
         {efBucket && efFloor > 0 && (
@@ -287,17 +355,16 @@ export default function HomeScreen() {
         )}
 
         <HeroRing
-          totalIncome={totalIncome}
-          actualSafeToSpend={actualSafeToSpend}
-          safeBeforeInvestments={safeBeforeInvestments}
-          plannedSavings={plannedSavings}
-          flaggedAmount={flaggedAmount}
+          monthlyIncome={monthlyIncome || totalIncome}
+          effectiveIncome={effectiveIncome}
+          safeToSpend={safeToSpend}
+          lifestyleSpent={lifestyleSpent}
+          personalDraws={personalDraws}
+          confirmedSavedInvested={confirmedSavedInvested}
+          unconfirmedSavingsThisMonth={unconfirmedSavingsThisMonth}
           daysRemaining={daysRemaining}
           weeklyRate={weeklyRate}
-          totalSpent={totalSpent}
-          stillToSave={stillToSave}
-          stillToInvest={stillToInvest}
-          lifestyleSpent={lifestyleSpent}
+          flaggedAmount={flaggedAmount}
         />
 
         <LivingSection
@@ -311,7 +378,9 @@ export default function HomeScreen() {
           goalGroups={goalGroups}
           standaloneBuckets={standaloneBuckets}
           confirmedBucketIds={confirmedSavingIds}
+          showPlaceholder={!hasBigSpendGoal}
           onConfirm={handleConfirmSavings}
+          onAddGoal={() => router.push('/(tabs)/goals')}
         />
 
         <View style={{ height: 80 }} />
@@ -338,8 +407,23 @@ export default function HomeScreen() {
         visible={checklistVisible}
         items={checklistItems}
         onToggleItem={handleToggleChecklistItem}
+        onUndoItem={handleUndoChecklistItem}
         onDismiss={() => setChecklistVisible(false)}
       />
+
+      {personalBucket && (
+        <PersonalCapPrompt
+          visible={capPromptVisible}
+          balance={personalBalance}
+          defaultCap={personalBucket.accumulationCap ?? 20000}
+          mode={capPromptMode}
+          onClose={() => setCapPromptVisible(false)}
+          onRebalance={() => {
+            setCapPromptVisible(false)
+            router.push('/(tabs)/goals')
+          }}
+        />
+      )}
     </View>
   )
 }

@@ -1,132 +1,298 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+
 import { colors } from '@/constants/colors'
+
 import { formatNPR, formatDate } from '@/lib/format'
+
 import { detectSourceApp } from '@/lib/ocr'
+
 import { sourceAppLabel } from '@/lib/ocr-templates'
+
+import { transactionSubtitle, transactionTitle } from '@/lib/transaction-label'
+
 import type { Transaction } from '@/store/transactions'
 
+
+
 function sourceBadgeLabel(transaction: Transaction): string | null {
+
   if (transaction.source === 'manual') return null
 
-  const hint = [transaction.merchant, transaction.remarks].filter(Boolean).join(' ')
+
+
+  const hint = [transaction.merchant, transaction.remarks, transaction.description]
+
+    .filter(Boolean)
+
+    .join(' ')
+
   const appLabel = hint ? sourceAppLabel(detectSourceApp(hint)) : null
 
+
+
   if (transaction.source === 'overlay') return appLabel ?? 'Bubble'
+
   if (transaction.source === 'ocr') return appLabel ?? 'OCR'
+
   return null
+
 }
+
+
 
 interface TransactionRowProps {
+
   transaction: Transaction
+
   bucketName: string
+
   bucketColor: string
+
   onPress: () => void
+
 }
+
+
 
 export function TransactionRow({ transaction, bucketName, bucketColor, onPress }: TransactionRowProps) {
+
   const isIncome = transaction.type === 'income'
+
   const badgeLabel = sourceBadgeLabel(transaction)
 
+  const title = transactionTitle(transaction)
+
+  const subtitle = transactionSubtitle(transaction)
+
+
+
   return (
+
     <TouchableOpacity
+
       style={[styles.row, transaction.isFlagged && styles.flaggedRow]}
+
       onPress={onPress}
+
       activeOpacity={0.7}
+
     >
+
       <View style={styles.left}>
-        <Text style={styles.merchant} numberOfLines={1}>
-          {transaction.merchant || 'Unknown'}
+
+        <Text style={styles.title} numberOfLines={1}>
+
+          {title}
+
         </Text>
+
+        {subtitle ? (
+
+          <Text style={styles.subtitle} numberOfLines={1}>
+
+            {subtitle}
+
+          </Text>
+
+        ) : null}
+
         <Text style={styles.date}>{formatDate(transaction.date)}</Text>
+
       </View>
+
+
 
       <View style={styles.center}>
+
         <View style={[styles.bucketPill, { backgroundColor: bucketColor + '22' }]}>
+
           <Text style={[styles.bucketPillText, { color: bucketColor }]} numberOfLines={1}>
+
             {bucketName}
+
           </Text>
+
         </View>
+
         {badgeLabel && (
+
           <View
+
             style={[
+
               styles.sourceBadge,
+
               transaction.source === 'overlay' && styles.overlayBadge,
+
             ]}
+
           >
+
             <Text style={styles.sourceBadgeText}>{badgeLabel}</Text>
+
           </View>
+
         )}
+
       </View>
 
+
+
       <Text style={[styles.amount, { color: isIncome ? colors.green : colors.red }]}>
+
         {isIncome ? '+' : '-'} NPR {formatNPR(transaction.amount)}
+
       </Text>
+
     </TouchableOpacity>
+
   )
+
 }
 
+
+
 const styles = StyleSheet.create({
+
   row: {
+
     flexDirection: 'row',
+
     alignItems: 'center',
+
     backgroundColor: colors.surface,
+
     paddingHorizontal: 16,
-    paddingVertical: 14,
+
+    paddingVertical: 16,
+
     borderBottomWidth: 1,
+
     borderBottomColor: colors.divider,
+
   },
+
   flaggedRow: {
-    borderLeftWidth: 3,
+
+    borderLeftWidth: 4,
+
     borderLeftColor: colors.amber,
+
+    backgroundColor: '#F59E0B12',
+
   },
+
   left: {
+
     flex: 1,
+
     marginRight: 8,
+
   },
-  merchant: {
+
+  title: {
+
     fontSize: 15,
+
     fontFamily: 'Inter_700Bold',
+
     color: colors.textPrimary,
+
   },
-  date: {
+
+  subtitle: {
+
     fontSize: 12,
+
     fontFamily: 'Inter_400Regular',
+
     color: colors.textMuted,
+
     marginTop: 2,
+
   },
-  center: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginRight: 8,
-  },
-  bucketPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    maxWidth: 90,
-  },
-  bucketPillText: {
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-  },
-  sourceBadge: {
-    backgroundColor: colors.divider,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  overlayBadge: {
-    backgroundColor: colors.greenFill,
-  },
-  sourceBadgeText: {
-    fontSize: 9,
-    fontFamily: 'Inter_600SemiBold',
+
+  date: {
+
+    fontSize: 12,
+
+    fontFamily: 'Inter_400Regular',
+
     color: colors.textMuted,
+
+    marginTop: 2,
+
   },
+
+  center: {
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 6,
+
+    marginRight: 8,
+
+  },
+
+  bucketPill: {
+
+    paddingHorizontal: 8,
+
+    paddingVertical: 3,
+
+    borderRadius: 10,
+
+    maxWidth: 90,
+
+  },
+
+  bucketPillText: {
+
+    fontSize: 11,
+
+    fontFamily: 'Inter_500Medium',
+
+  },
+
+  sourceBadge: {
+
+    backgroundColor: colors.divider,
+
+    paddingHorizontal: 5,
+
+    paddingVertical: 2,
+
+    borderRadius: 4,
+
+  },
+
+  overlayBadge: {
+
+    backgroundColor: colors.greenFill,
+
+  },
+
+  sourceBadgeText: {
+
+    fontSize: 9,
+
+    fontFamily: 'Inter_600SemiBold',
+
+    color: colors.textMuted,
+
+  },
+
   amount: {
+
     fontSize: 15,
+
     fontFamily: 'Inter_700Bold',
+
     fontVariant: ['tabular-nums'],
+
   },
+
 })
+

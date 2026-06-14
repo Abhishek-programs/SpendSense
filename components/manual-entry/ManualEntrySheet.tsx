@@ -44,6 +44,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const [amount, setAmount] = useState('')
   const [isIncome, setIsIncome] = useState(false)
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null)
+  const [description, setDescription] = useState('')
   const [merchant, setMerchant] = useState('')
   const [remarks, setRemarks] = useState('')
   const [date, setDate] = useState(new Date())
@@ -60,6 +61,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
       setAmount('')
       setIsIncome(false)
       setSelectedBucketId(null)
+      setDescription('')
       setMerchant('')
       setRemarks('')
       setDate(new Date())
@@ -67,6 +69,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
       setIsRecurring(false)
       setSaving(false)
       setFromOcr(false)
+      setTimeout(() => amountRef.current?.focus(), 300)
     }
   }, [visible])
 
@@ -83,6 +86,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         await addTransaction({
           type: 'income',
           amount: parsedAmount,
+          description: description.trim() || null,
           merchant: merchant.trim() || null,
           bucketId: INCOME_BUCKET_ID,
           date: date.toISOString(),
@@ -94,7 +98,8 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         })
       } else {
         const catInput = {
-          remarks: remarks.trim() || null,
+          description: description.trim() || null,
+          remarks: fromOcr ? remarks.trim() || merchant.trim() || null : null,
           merchant: merchant.trim() || null,
           keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
           sureShotMerchants: sureShotMerchants.map(m => ({ merchantName: m.merchantName, bucketId: m.bucketId })),
@@ -102,18 +107,18 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         }
         const result = categorize(catInput)
 
-        const hasRemarksPrefix = remarks.trim().match(/(\S+)\s*-\s*$/) !== null
-        const finalBucketId = hasRemarksPrefix ? result.bucketId : (selectedBucketId ?? result.bucketId)
-        const finalFlagged = hasRemarksPrefix ? result.isFlagged : (selectedBucketId ? false : result.isFlagged)
+        const finalBucketId = selectedBucketId ?? result.bucketId
+        const finalFlagged = selectedBucketId ? false : result.isFlagged
 
         const { overspent } = await addTransaction({
           type: 'expense',
           amount: parsedAmount,
+          description: description.trim() || null,
           merchant: merchant.trim() || null,
           bucketId: finalBucketId,
           date: date.toISOString(),
           source: fromOcr ? 'ocr' : 'manual',
-          remarks: remarks.trim() || null,
+          remarks: fromOcr ? remarks.trim() || merchant.trim() || null : null,
           parsedTxnId: null,
           isFlagged: finalFlagged,
           isRecurringDraft: isRecurring,
@@ -224,6 +229,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                         if (ocr.date) setDate(new Date(ocr.date))
 
                         const catResult = categorize({
+                          description: null,
                           remarks: ocr.remarks,
                           merchant: ocr.merchant,
                           keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
@@ -234,6 +240,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
 
                         setFromOcr(true)
                         setMode('manual')
+                        setTimeout(() => amountRef.current?.focus(), 200)
                       } catch {
                         alert('Could not scan receipt. Use a dev client with ML Kit, or fill manually.')
                         setMode('manual')
@@ -338,33 +345,28 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
               </View>
             )}
 
-            {/* Merchant */}
+            {/* Description — what you did / bought */}
             <View style={styles.section}>
-              <Text style={styles.label}>Merchant / description</Text>
+              <Text style={styles.label}>Description</Text>
               <TextInput
                 style={styles.textInput}
-                value={merchant}
-                onChangeText={setMerchant}
-                placeholder="e.g. Bhat-Bhateni, NTC"
+                value={description}
+                onChangeText={setDescription}
+                placeholder="e.g. Outing with friends, momo, date with baby"
                 placeholderTextColor={colors.textMuted}
               />
             </View>
 
-            {/* Remarks */}
+            {/* Merchant — optional, usually from OCR */}
             <View style={styles.section}>
-              <Text style={styles.label}>Remarks</Text>
+              <Text style={styles.label}>Merchant (optional)</Text>
               <TextInput
                 style={styles.textInput}
-                value={remarks}
-                onChangeText={setRemarks}
-                placeholder="e.g. #fun coffee with friends"
+                value={merchant}
+                onChangeText={setMerchant}
+                placeholder="e.g. Bhat-Bhateni, NTC — from receipt if scanned"
                 placeholderTextColor={colors.textMuted}
               />
-              {remarks.startsWith('#') && (
-                <Text style={styles.hint}>
-                  Prefix tag will auto-assign bucket
-                </Text>
-              )}
             </View>
 
             {/* Date */}
@@ -626,13 +628,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_400Regular',
     color: colors.textPrimary,
-  },
-  hint: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    color: colors.green,
-    marginTop: 4,
-    marginLeft: 4,
   },
   dateButton: {
     flexDirection: 'row',

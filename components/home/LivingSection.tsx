@@ -1,8 +1,22 @@
 import { View, Text, StyleSheet } from 'react-native'
+import {
+  CORE_LIVING_BUCKET_ID,
+  DATES_BUCKET_ID,
+  FUN_BUCKET_ID,
+  PERSONAL_BUCKET_ID,
+} from '@/constants/defaults'
 import { colors } from '@/constants/colors'
 import { formatNPR } from '@/lib/format'
+import { effectiveCap } from '@/lib/bucket-balance'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import type { Bucket } from '@/store/buckets'
+
+const BUCKET_HINTS: Record<string, string> = {
+  [CORE_LIVING_BUCKET_ID]: 'Household & groceries',
+  [DATES_BUCKET_ID]: 'All date spending',
+  [FUN_BUCKET_ID]: 'Social & eating out',
+  [PERSONAL_BUCKET_ID]: 'One-off buys · rolls over',
+}
 
 interface LivingSectionProps {
   buckets: Bucket[]
@@ -28,7 +42,9 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </View>
           <View style={styles.nameCol}>
             <Text style={styles.name}>{bucket.name}</Text>
-            <Text style={styles.sublabel}>Budget</Text>
+            <Text style={styles.sublabel}>
+              {BUCKET_HINTS[bucket.id] ?? 'Budget'}
+            </Text>
           </View>
           <Text style={styles.amounts}>
             {formatNPR(spent)}{' '}
@@ -48,7 +64,7 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
 
   const renderFundRow = (bucket: Bucket, showDivider: boolean) => {
     const balance = bucketBalances[bucket.id] ?? 0
-    const cap = bucket.accumulationCap ?? bucket.monthlyAmount * 4
+    const cap = effectiveCap(bucket) ?? bucket.monthlyAmount * 4
     const ratio = cap > 0 ? balance / cap : 0
     const barColor =
       balance <= 0 ? colors.red : balance < PERSONAL_LOW_BALANCE ? colors.amber : colors.green
@@ -62,7 +78,9 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </View>
           <View style={styles.nameCol}>
             <Text style={styles.name}>{bucket.name}</Text>
-            <Text style={styles.sublabel}>Fund</Text>
+            <Text style={styles.sublabel}>
+              {BUCKET_HINTS[bucket.id] ?? 'Fund'}
+            </Text>
           </View>
           <Text style={styles.amounts}>
             NPR {formatNPR(balance)}

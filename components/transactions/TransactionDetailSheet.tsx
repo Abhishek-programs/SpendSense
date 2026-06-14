@@ -15,8 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatDate } from '@/lib/format'
+import { transactionTitle } from '@/lib/transaction-label'
 import { useBucketsStore } from '@/store/buckets'
-import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
+import { useTransactionsStore } from '@/store/transactions'
 import type { Transaction } from '@/store/transactions'
 
 interface TransactionDetailSheetProps {
@@ -32,12 +33,16 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
   const allBuckets = [...getSpendingBuckets(), ...getSavingsBuckets()]
 
   const [selectedBucketId, setSelectedBucketId] = useState<string>('')
+  const [description, setDescription] = useState('')
+  const [merchant, setMerchant] = useState('')
   const [remarks, setRemarks] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (transaction && visible) {
       setSelectedBucketId(transaction.bucketId)
+      setDescription(transaction.description ?? '')
+      setMerchant(transaction.merchant ?? '')
       setRemarks(transaction.remarks ?? '')
       setSaving(false)
     }
@@ -52,7 +57,13 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
     if (saving) return
     setSaving(true)
     try {
-      const patch: Partial<Transaction> = { remarks: remarks.trim() || null }
+      const patch: Partial<Transaction> = {
+        description: description.trim() || null,
+        merchant: merchant.trim() || null,
+      }
+      if (!transaction.remarks?.startsWith('__')) {
+        patch.remarks = remarks.trim() || null
+      }
       if (isExpense && selectedBucketId) {
         patch.bucketId = selectedBucketId
         if (transaction.isFlagged && selectedBucketId !== transaction.bucketId) {
@@ -121,10 +132,33 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
               </View>
             </View>
 
+            {/* Description */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Description</Text>
+              {isIncome ? (
+                <Text style={styles.valueText}>{transactionTitle(transaction)}</Text>
+              ) : (
+                <TextInput
+                  style={styles.textInput}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="What you bought or did"
+                  placeholderTextColor={colors.textMuted}
+                />
+              )}
+            </View>
+
             {/* Merchant */}
             <View style={styles.section}>
-              <Text style={styles.label}>Merchant / description</Text>
-              <Text style={styles.valueText}>{transaction.merchant || 'Unknown'}</Text>
+              <Text style={styles.label}>Merchant</Text>
+              <TextInput
+                style={styles.textInput}
+                value={merchant}
+                onChangeText={setMerchant}
+                placeholder="Place name from receipt (optional)"
+                placeholderTextColor={colors.textMuted}
+                editable={!isIncome || transaction.source !== 'manual'}
+              />
             </View>
 
             {/* Bucket selector — expense only */}
@@ -160,17 +194,18 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
               </View>
             )}
 
-            {/* Remarks */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Remarks</Text>
-              <TextInput
-                style={styles.textInput}
-                value={remarks}
-                onChangeText={setRemarks}
-                placeholder="Add a note..."
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
+            {!transaction.remarks?.startsWith('__') ? (
+              <View style={styles.section}>
+                <Text style={styles.label}>Remarks</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={remarks}
+                  onChangeText={setRemarks}
+                  placeholder="OCR notes (optional)"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            ) : null}
 
             {/* Date */}
             <View style={styles.section}>
@@ -277,6 +312,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_500Medium',
     color: colors.textPrimary,
+  },
+  hint: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 6,
   },
   chipRow: {
     flexDirection: 'row',

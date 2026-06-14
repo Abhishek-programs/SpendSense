@@ -7,12 +7,14 @@ Personal finance app for Android. React Native + Expo. NPR, Nepal-focused. **No 
 | Priority | File | Use for |
 |---|---|---|
 | 1 | **This file** | Stack, rules, repo map, agent workflow |
-| 2 | `docs/screen-flows.md` | Screen behavior and UX specs |
-| 3 | `BUILD_ORDER.md` | What's done vs next |
-| 4 | `docs/prd.md` | Product intent (may be stale) |
-| 5 | `docs/overlay-v2.md` | V2 bubble overlay — only when building overlay |
+| 2 | `docs/core-function.md` | Mental model, money flows, month logic |
+| 3 | `docs/design-and-features.md` | Finalized UI, screens, formulas |
+| 4 | `docs/screen-flows.md` | Screen behavior and UX specs (historical where stale) |
+| 5 | `BUILD_ORDER.md` | What's done vs next |
+| 6 | `docs/prd.md` | Product intent (historical where stale) |
+| 7 | `docs/overlay-v2.md` | V2 bubble overlay — only when building overlay |
 
-If docs conflict: **AGENTS.md → screen-flows → BUILD_ORDER → prd**.
+If docs conflict: **AGENTS.md → core-function / design-and-features → screen-flows → BUILD_ORDER → prd**.
 
 ---
 
@@ -67,7 +69,7 @@ components/
 
 store/                  Zustand — playbook, buckets, transactions, goals
 db/                     schema.ts, client.ts, migrations/, seed.ts
-lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, goals/plan, goals/actions, dev/mock-data, …
+lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, goals/, month-surplus, personal-cap, transaction-label, …
 native/android/overlay/ Kotlin overlay module (source of truth; copied to android/ on prebuild)
 plugins/                withSpendSenseOverlay.js — manifest, gradle, MainApplication, copy overlay sources
 constants/              colors.ts, defaults.ts (no seeded BigExpense buckets — goals create buckets dynamically)
@@ -97,27 +99,29 @@ Home  |  Transactions  |  [+]  |  Goals  |  Settings
 
 **Auto-categorization** (`lib/categorize.ts`) — strict priority:
 
-1. Remarks suffix `keyword -` → bucket (case-insensitive)
-2. Sure-shot merchant list (Settings)
+1. Keyword appears in description, remarks, or merchant text → mapped bucket
+2. Sure-shot merchant list (Settings)  
 3. Fallback bucket + `is_flagged = true`
 
 Never auto-memorize ambiguous merchants.
 
 **Month boundaries:** user `month_start_day` from playbook — not calendar month (`lib/month.ts`).
 
-**EF target:** `EF_MULTIPLIER` × Core Living bucket — never from income (`constants/defaults.ts`).
+**Safe to spend:** unlocks only after salary is confirmed this month (`__salary__` income txn). Ring and safe-to-spend exclude carried-forward balance (`hooks/usePulseData.ts`).
+
+**EF target:** `EF_MULTIPLIER` × Core Living monthly amount (`constants/defaults.ts`, onboarding Foundations).
 
 **Spending buckets:** green &lt;80%, amber 80–99%, red ≥100%.
 
 **Nudges:** max 1/day, quiet 10pm–8am (`lib/notifications.ts`).
 
-**V2 overlay:** additive only — do not change `lib/categorize.ts`, `store/`, or `db/schema.ts`. See `docs/overlay-v2.md`.
+**Overlay work:** keep changes scoped to `native/android/overlay/`, `plugins/`, `hooks/useOverlay.ts`. See `docs/overlay-v2.md`.
 
 ---
 
 ## V1 scope (short)
 
-**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (dual safe-to-spend), transactions + charts, goals, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export, dev mock inject.
+**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (Your money + Hero ring), transactions + charts, goals/Vault, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export.
 
 **Out:** share intent, SMS/email, dark mode, AI chat, iOS, cloud sync. Bubble overlay requires dev client build.
 

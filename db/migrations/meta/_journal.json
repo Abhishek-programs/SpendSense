@@ -50,6 +50,20 @@
       "when": 1775787843289,
       "tag": "0006_personal_bucket_balances",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1775887843289,
+      "tag": "0007_home_finance_ux",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1775987843289,
+      "tag": "0008_transaction_description",
+      "breakpoints": true
     }
   ]
 }

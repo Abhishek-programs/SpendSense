@@ -11,6 +11,10 @@ export const playbook = sqliteTable('playbook', {
   isOnboarded: integer('is_onboarded', { mode: 'boolean' }).notNull().default(false),
   lastChecklistMonth: text('last_checklist_month'), // format YYYY-MM
   lastBalanceRolloverMonth: text('last_balance_rollover_month'), // format YYYY-MM
+  userAge: integer('user_age'),
+  carriedForwardBalance: real('carried_forward_balance').default(0),
+  lastSurplusRolloverMonth: text('last_surplus_rollover_month'),
+  lastPersonalRebalancePromptMonth: text('last_personal_rebalance_prompt_month'),
 })
 
 export const buckets = sqliteTable('buckets', {
@@ -27,6 +31,9 @@ export const buckets = sqliteTable('buckets', {
   goalBucketRole: text('goal_bucket_role', { enum: ['full', 'upfront', 'emi_reserve'] }),
   accumulates: integer('accumulates', { mode: 'boolean' }).notNull().default(false),
   accumulationCap: real('accumulation_cap'),
+  capOverride: real('cap_override'),
+  capOverrideReason: text('cap_override_reason'),
+  capOverridePurchaseAmount: real('cap_override_purchase_amount'),
 })
 
 export const bucketBalances = sqliteTable('bucket_balances', {
@@ -53,6 +60,7 @@ export const transactions = sqliteTable('transactions', {
   type: text('type', { enum: ['expense', 'income'] }).notNull().default('expense'),
   amount: real('amount').notNull(),
   merchant: text('merchant'),
+  description: text('description'),
   bucketId: text('bucket_id').notNull(),
   date: text('date').notNull(), // ISO string
   source: text('source', { enum: ['manual', 'ocr', 'overlay'] }).notNull().default('manual'),
@@ -75,6 +83,8 @@ export const goals = sqliteTable('goals', {
   upfrontAmount: real('upfront_amount'),
   emiTenureMonths: integer('emi_tenure_months'),
   isEnabled: integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
+  completedAt: text('completed_at'),
+  freedMonthlyAmount: real('freed_monthly_amount'),
   createdAt: text('created_at').notNull(),
 })
 

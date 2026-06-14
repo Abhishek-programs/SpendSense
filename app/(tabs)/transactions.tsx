@@ -377,13 +377,15 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 16,
+    paddingBottom: 8,
     backgroundColor: colors.pageBg,
   },
   sectionHeaderText: {
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.textMuted,
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    letterSpacing: 0.2,
   },
   empty: {
     flex: 1,

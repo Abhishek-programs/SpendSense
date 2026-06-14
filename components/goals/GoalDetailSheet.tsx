@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  TextInput,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -26,12 +27,23 @@ interface GoalDetailSheetProps {
 }
 
 export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSheetProps) {
-  const { deleteGoal } = useGoalsStore()
-  const { buckets } = useBucketsStore()
+  const { deleteGoal, updateGoalPaymentPlan } = useGoalsStore()
+  const { buckets, loadBuckets } = useBucketsStore()
+  const [editingMonthly, setEditingMonthly] = useState(false)
+  const [monthlyDraft, setMonthlyDraft] = useState('')
 
   if (!goal) return null
 
   const linkedBuckets = buckets.filter(b => goal.linkedBucketIds.includes(b.id))
+  const isArchived = !!goal.completedAt
+
+  const handleSaveMonthly = async () => {
+    const val = parseFloat(monthlyDraft)
+    if (!val || val <= 0) return
+    await updateGoalPaymentPlan(goal.id, { monthlyContribution: val })
+    await loadBuckets()
+    setEditingMonthly(false)
+  }
 
   const handleDelete = () => {
     Alert.alert(
@@ -105,7 +117,30 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Monthly</Text>
-                <Text style={styles.statValue}>{formatNPRShort(goal.monthlyContribution)}</Text>
+                {editingMonthly && !isArchived ? (
+                  <View style={styles.monthlyEditRow}>
+                    <TextInput
+                      style={styles.monthlyInput}
+                      value={monthlyDraft}
+                      onChangeText={setMonthlyDraft}
+                      keyboardType="numeric"
+                      autoFocus
+                    />
+                    <TouchableOpacity onPress={handleSaveMonthly}>
+                      <Text style={styles.saveLink}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    disabled={isArchived}
+                    onPress={() => {
+                      setMonthlyDraft(String(goal.monthlyContribution))
+                      setEditingMonthly(true)
+                    }}
+                  >
+                    <Text style={styles.statValue}>{formatNPRShort(goal.monthlyContribution)}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Target</Text>
@@ -252,6 +287,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
+  },
+  monthlyEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  monthlyInput: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.green,
+    minWidth: 80,
+    paddingVertical: 2,
+  },
+  saveLink: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.green,
   },
   projectionCard: {
     marginHorizontal: 16,

@@ -11,10 +11,22 @@ interface GoalCardProps {
   monthly: number
   color: string
   paused?: boolean
+  archived?: boolean
+  suggestedTarget?: number | null
   onPress: () => void
 }
 
-export function GoalCard({ name, current, target, monthly, color, paused, onPress }: GoalCardProps) {
+export function GoalCard({
+  name,
+  current,
+  target,
+  monthly,
+  color,
+  paused,
+  archived,
+  suggestedTarget,
+  onPress,
+}: GoalCardProps) {
   const percent = Math.min((current / target) * 100, 100)
   const { projectedDate, nudge } = projectGoal({ current, target, monthly })
 
@@ -47,7 +59,12 @@ export function GoalCard({ name, current, target, monthly, color, paused, onPres
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
               <Text style={[styles.name, paused && styles.namePaused]}>{name}</Text>
-              {paused && (
+              {archived && (
+                <View style={styles.archivedBadge}>
+                  <Text style={styles.archivedBadgeText}>Archived</Text>
+                </View>
+              )}
+              {paused && !archived && (
                 <View style={styles.pausedBadge}>
                   <Text style={styles.pausedBadgeText}>Paused</Text>
                 </View>
@@ -58,11 +75,16 @@ export function GoalCard({ name, current, target, monthly, color, paused, onPres
           
           <View style={styles.meta}>
             <Text style={styles.progressText}>
-              {formatNPRShort(current)} of {formatNPRShort(target)}
+              {formatNPRShort(current)} of {formatNPRShort(suggestedTarget ?? target)}
             </Text>
-            <Text style={styles.monthlyText}>
-              {formatNPRShort(monthly)}/mo
-            </Text>
+            {!archived && (
+              <Text style={styles.monthlyText}>{formatNPRShort(monthly)}/mo</Text>
+            )}
+            {suggestedTarget != null && !archived && (
+              <Text style={styles.suggestedText}>
+                Suggested target: {formatNPRShort(suggestedTarget)}
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -141,6 +163,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
   },
+  archivedBadge: {
+    backgroundColor: colors.divider,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  archivedBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
   date: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
@@ -160,6 +194,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textMuted,
+  },
+  suggestedText: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
+    marginTop: 4,
   },
   nudge: {
     marginTop: 16,

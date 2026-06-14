@@ -130,7 +130,34 @@ INSERT INTO \`keyword_mappings\` (\`keyword\`, \`bucket_id\`)
 SELECT 'personal', COALESCE((SELECT id FROM buckets WHERE id = 'personal' OR name = 'Personal' LIMIT 1), 'personal')
 WHERE NOT EXISTS (SELECT 1 FROM \`keyword_mappings\` WHERE \`keyword\` = 'personal');`
 
+const m0007 = `ALTER TABLE \`playbook\` ADD COLUMN \`user_age\` integer;
+--> statement-breakpoint
+ALTER TABLE \`playbook\` ADD COLUMN \`carried_forward_balance\` real DEFAULT 0;
+--> statement-breakpoint
+ALTER TABLE \`playbook\` ADD COLUMN \`last_surplus_rollover_month\` text;
+--> statement-breakpoint
+ALTER TABLE \`playbook\` ADD COLUMN \`last_personal_rebalance_prompt_month\` text;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`cap_override\` real;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`cap_override_reason\` text;
+--> statement-breakpoint
+ALTER TABLE \`buckets\` ADD COLUMN \`cap_override_purchase_amount\` real;
+--> statement-breakpoint
+ALTER TABLE \`goals\` ADD COLUMN \`completed_at\` text;
+--> statement-breakpoint
+ALTER TABLE \`goals\` ADD COLUMN \`freed_monthly_amount\` real;
+--> statement-breakpoint
+UPDATE \`buckets\` SET \`is_active\` = 0, \`show_on_home\` = 0 WHERE \`id\` = 'food';`
+
+const m0008 = `ALTER TABLE \`transactions\` ADD COLUMN \`description\` text;
+--> statement-breakpoint
+UPDATE \`transactions\` SET \`description\` = \`remarks\`
+WHERE \`description\` IS NULL
+  AND \`remarks\` IS NOT NULL
+  AND \`remarks\` NOT LIKE '__%';`
+
 export const migrations = {
   journal,
-  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006 },
+  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008 },
 }

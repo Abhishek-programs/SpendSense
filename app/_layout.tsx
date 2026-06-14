@@ -18,6 +18,7 @@ import {
   setLastNotificationDate,
 } from '@/lib/notifications'
 import { runMonthRollover } from '@/lib/bucket-balance'
+import { runSurplusRollover } from '@/lib/month-surplus'
 import { useOverlay } from '@/hooks/useOverlay'
 
 SplashScreen.preventAutoHideAsync()
@@ -54,10 +55,18 @@ export default function RootLayout() {
     const { start, end } = getMonthRange(pb.monthStartDay)
     loadBuckets().then(() => {
       if (isOnboarded) {
-        runMonthRollover(pb.monthStartDay, pb.lastBalanceRolloverMonth).then(monthKey => {
+        runMonthRollover(pb.monthStartDay, pb.lastBalanceRolloverMonth).then(async monthKey => {
           if (monthKey !== pb.lastBalanceRolloverMonth) {
-            pb.updatePlaybook({ lastBalanceRolloverMonth: monthKey })
-            useBucketsStore.getState().refreshBalances()
+            await pb.updatePlaybook({ lastBalanceRolloverMonth: monthKey })
+            await useBucketsStore.getState().loadBuckets()
+          }
+          const surplusKey = await runSurplusRollover(
+            pb.monthStartDay,
+            pb.lastSurplusRolloverMonth,
+          )
+          if (surplusKey !== pb.lastSurplusRolloverMonth) {
+            await pb.updatePlaybook({ lastSurplusRolloverMonth: surplusKey })
+            await usePlaybookStore.getState().loadPlaybook()
           }
         })
       }

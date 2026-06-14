@@ -32,21 +32,9 @@ export function applySchemaPatches() {
     const foodBucket = sqlite.getFirstSync<{ id: string }>(
       `SELECT id FROM buckets WHERE id = 'food' OR name = 'Food' LIMIT 1`
     )
-    if (!foodBucket) {
-      sqlite.execSync(
-        `INSERT INTO \`buckets\` (\`id\`, \`name\`, \`type\`, \`monthly_amount\`, \`color\`, \`icon\`, \`sort_order\`, \`is_active\`, \`show_on_home\`)
-         VALUES ('food', 'Food', 'spending', 8000, '#F97316', '🍽️', 3, 1, 1)`
-      )
-    }
-
-    const foodId = foodBucket?.id ?? 'food'
-    const foodKeyword = sqlite.getFirstSync(
-      `SELECT id FROM keyword_mappings WHERE keyword = 'food' LIMIT 1`
-    )
-    if (!foodKeyword) {
-      sqlite.execSync(
-        `INSERT INTO \`keyword_mappings\` (\`keyword\`, \`bucket_id\`) VALUES ('food', '${foodId}')`
-      )
+    if (foodBucket) {
+      sqlite.execSync(`DELETE FROM keyword_mappings WHERE keyword = 'food'`)
+      sqlite.execSync(`DELETE FROM buckets WHERE id = '${foodBucket.id}'`)
     }
 
     if (!hasColumn('buckets', 'linked_goal_id')) {
@@ -61,6 +49,18 @@ export function applySchemaPatches() {
     if (!hasColumn('buckets', 'accumulation_cap')) {
       sqlite.execSync(`ALTER TABLE \`buckets\` ADD COLUMN \`accumulation_cap\` real`)
     }
+    if (!hasColumn('buckets', 'cap_override')) {
+      sqlite.execSync(`ALTER TABLE \`buckets\` ADD COLUMN \`cap_override\` real`)
+    }
+    if (!hasColumn('buckets', 'cap_override_reason')) {
+      sqlite.execSync(`ALTER TABLE \`buckets\` ADD COLUMN \`cap_override_reason\` text`)
+    }
+    if (!hasColumn('buckets', 'cap_override_purchase_amount')) {
+      sqlite.execSync(`ALTER TABLE \`buckets\` ADD COLUMN \`cap_override_purchase_amount\` real`)
+    }
+    sqlite.execSync(`UPDATE \`buckets\` SET \`is_active\` = 0, \`show_on_home\` = 0 WHERE \`id\` = 'food' OR \`name\` = 'Food'`)
+    sqlite.execSync(`DELETE FROM keyword_mappings WHERE keyword = 'food'`)
+    sqlite.execSync(`DELETE FROM buckets WHERE id = 'food' OR name = 'Food'`)
 
     const personalBucket = sqlite.getFirstSync<{ id: string }>(
       `SELECT id FROM buckets WHERE id = 'personal' OR name = 'Personal' LIMIT 1`
@@ -88,6 +88,18 @@ export function applySchemaPatches() {
   )
   if (playbookTable && !hasColumn('playbook', 'last_balance_rollover_month')) {
     sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_balance_rollover_month\` text`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'user_age')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`user_age\` integer`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'carried_forward_balance')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`carried_forward_balance\` real DEFAULT 0`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'last_surplus_rollover_month')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_surplus_rollover_month\` text`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'last_personal_rebalance_prompt_month')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_personal_rebalance_prompt_month\` text`)
   }
 
   const balancesTable = sqlite.getFirstSync(
@@ -120,6 +132,25 @@ export function applySchemaPatches() {
     if (!hasColumn('goals', 'is_enabled')) {
       sqlite.execSync(`ALTER TABLE \`goals\` ADD COLUMN \`is_enabled\` integer DEFAULT true NOT NULL`)
     }
+    if (!hasColumn('goals', 'completed_at')) {
+      sqlite.execSync(`ALTER TABLE \`goals\` ADD COLUMN \`completed_at\` text`)
+    }
+    if (!hasColumn('goals', 'freed_monthly_amount')) {
+      sqlite.execSync(`ALTER TABLE \`goals\` ADD COLUMN \`freed_monthly_amount\` real`)
+    }
+  }
+
+  const transactionsExists = sqlite.getFirstSync(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'`
+  )
+  if (transactionsExists && !hasColumn('transactions', 'description')) {
+    sqlite.execSync(`ALTER TABLE \`transactions\` ADD COLUMN \`description\` text`)
+    sqlite.execSync(
+      `UPDATE \`transactions\` SET \`description\` = \`remarks\`
+       WHERE \`description\` IS NULL
+         AND \`remarks\` IS NOT NULL
+         AND \`remarks\` NOT LIKE '__%'`,
+    )
   }
 }
 

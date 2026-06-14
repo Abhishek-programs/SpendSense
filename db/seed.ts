@@ -10,10 +10,9 @@ import {
 } from '@/constants/defaults'
 import { ensureBalanceRow } from '@/lib/bucket-balance'
 
-// Called once after first migration. Seeds default playbook and buckets.
 export async function seedDefaults() {
   const existing = await db.select().from(playbook).limit(1)
-  if (existing.length > 0) return // Already seeded
+  if (existing.length > 0) return
 
   const bucketInserts = DEFAULT_BUCKETS.map((b, i) => ({
     id: b.id,
