@@ -181,7 +181,6 @@ export function FutureSection({
                 amount={bucket.monthlyAmount}
                 confirmed={confirmedBucketIds.has(bucket.id)}
                 progress={progressByBucket[bucket.id]}
-                icon={isEF ? '🛡️' : undefined}
                 accent={isEF ? EF_ACCENT : undefined}
                 onPress={() => onConfirm(bucket.id)}
               />
