@@ -63,7 +63,7 @@ export const transactions = sqliteTable('transactions', {
   description: text('description'),
   bucketId: text('bucket_id').notNull(),
   date: text('date').notNull(), // ISO string
-  source: text('source', { enum: ['manual', 'ocr', 'overlay'] }).notNull().default('manual'),
+  source: text('source', { enum: ['manual', 'ocr', 'overlay', 'notification'] }).notNull().default('manual'),
   remarks: text('remarks'),
   fundedFromBucketId: text('funded_from_bucket_id'),
   parsedTxnId: text('parsed_txn_id'),

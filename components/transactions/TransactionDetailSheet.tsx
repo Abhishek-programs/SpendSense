@@ -248,7 +248,13 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
             <View style={styles.section}>
               <Text style={styles.label}>Source</Text>
               <View style={styles.sourceBadge}>
-                <Text style={styles.sourceBadgeText}>Manual entry</Text>
+                <Text style={styles.sourceBadgeText}>
+                  {transaction.source === 'notification'
+                    ? 'Payment helper'
+                    : transaction.source === 'manual'
+                      ? 'Manual entry'
+                      : transaction.source}
+                </Text>
               </View>
             </View>
 

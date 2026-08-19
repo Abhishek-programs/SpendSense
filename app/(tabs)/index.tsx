@@ -64,7 +64,8 @@ export default function HomeScreen() {
     totalIncome,
     effectiveIncome,
     safeToSpend,
-    availableBalance,
+    yourMoney,
+    stillInBank,
     monthRemainingBalance,
     carriedForwardBalance,
     confirmedSavedInvested,
@@ -437,7 +438,8 @@ export default function HomeScreen() {
 
         {/* Net Worth Card */}
         <NetWorthCard
-          availableBalance={availableBalance}
+          availableBalance={yourMoney}
+          stillInBank={stillInBank}
           intentionalSavings={intentionalSavings}
           monthRemainingBalance={monthRemainingBalance}
           carriedForwardBalance={carriedForwardBalance}

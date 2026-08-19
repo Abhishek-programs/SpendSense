@@ -122,8 +122,10 @@ export function usePulseData() {
   const lentOutstandingThisMonth = lendBorrowMonth.lentOutstandingThisMonth
 
   const unconfirmedSavingsThisMonth = Math.max(0, plannedSavings - confirmedSavedInvested)
+  const stillInBank = hasSalaryThisMonth ? unconfirmedSavingsThisMonth : 0
 
   const availableBalance = Math.max(0, adjustedSafeToSpend) + carriedForwardBalance
+  const yourMoney = availableBalance + stillInBank
   const monthRemainingBalance = Math.max(0, adjustedSafeToSpend)
 
   const daysRemaining = getDaysRemaining(monthStartDay)
@@ -198,6 +200,8 @@ export function usePulseData() {
     effectiveIncome,
     hasSalaryThisMonth,
     availableBalance,
+    yourMoney,
+    stillInBank,
     safeToSpend: adjustedSafeToSpend,
     rawSafeToSpend: safeToSpend,
     monthRemainingBalance,

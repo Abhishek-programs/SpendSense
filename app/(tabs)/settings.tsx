@@ -10,6 +10,8 @@ import {
   StyleSheet,
   Pressable,
   Animated,
+  Platform,
+  AppState,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -37,6 +39,14 @@ import {
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
 import { useLendingStore } from '@/store/lending'
+import {
+  getPaymentWatchEnabled,
+  hasPaymentWatchUsageAccess,
+  isPaymentWatchAvailable,
+  openPaymentWatchUsageSettings,
+  setPaymentWatchEnabled,
+} from '@/lib/payment-watch'
+import { requestPermissions } from '@/lib/notifications'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
 
@@ -270,6 +280,103 @@ function useSavedFeedback() {
     }).start()
   }
   return { opacity, show }
+}
+
+function PaymentWatchCard() {
+  const available = isPaymentWatchAvailable()
+  const [enabled, setEnabled] = useState(false)
+  const [usage, setUsage] = useState(false)
+
+  const refresh = useCallback(async () => {
+    if (!available) return
+    const [on, access] = await Promise.all([
+      getPaymentWatchEnabled(),
+      hasPaymentWatchUsageAccess(),
+    ])
+    setEnabled(on)
+    setUsage(access)
+  }, [available])
+
+  useEffect(() => {
+    refresh()
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh()
+    })
+    return () => sub.remove()
+  }, [refresh])
+
+  if (Platform.OS !== 'android') return null
+
+  const onToggle = async (value: boolean) => {
+    if (!available) return
+    if (value) {
+      await requestPermissions()
+    }
+    const result = await setPaymentWatchEnabled(value)
+    await refresh()
+    if (value && result === 'needs_usage_access') {
+      Alert.alert(
+        'Usage access needed',
+        'Android will show a list of apps. Find SpendSense and turn usage access on. We never record your screen — we only see which app is open so we can offer a log notification.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Open settings', onPress: () => openPaymentWatchUsageSettings() },
+        ],
+      )
+    }
+  }
+
+  return (
+    <>
+      <SectionHeader
+        title="Payment helper"
+        description="While eSewa or nBank is open, type the amount in a notification. Assign a bucket the next time you open SpendSense. Off until you enable it."
+      />
+      <Card>
+        {!available ? (
+          <Text style={styles.sectionDesc}>
+            Needs a development build (not Expo Go). Rebuild with npx expo run:android.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.toggleRow}>
+              <Text style={[styles.editableLabel, { flex: 1, paddingRight: 12 }]}>
+                Log from eSewa / nBank
+              </Text>
+              <Switch
+                value={enabled}
+                onValueChange={onToggle}
+                trackColor={{ false: colors.border, true: colors.greenFill }}
+                thumbColor={enabled ? colors.green : '#f4f3f4'}
+              />
+            </View>
+            {enabled && !usage && (
+              <>
+                <View style={styles.divider} />
+                <Text style={[styles.sectionDesc, { marginBottom: 10 }]}>
+                  Usage access is off. SpendSense cannot tell when a payment app is open.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => openPaymentWatchUsageSettings()}
+                  style={styles.actionButton}
+                >
+                  <Text style={styles.actionButtonText}>Grant usage access</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {enabled && usage && (
+              <>
+                <View style={styles.divider} />
+                <Text style={styles.sectionDesc}>
+                  A quiet notification stays while this is on. When eSewa or nBank is in front, it becomes a reply field for NPR. No screenshot, no overlay, no accessibility service.
+                </Text>
+              </>
+            )}
+          </>
+        )}
+      </Card>
+    </>
+  )
 }
 
 export default function SettingsScreen() {
@@ -880,6 +987,8 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           )}
         </Card>
+
+        <PaymentWatchCard />
 
         {/* Section 5: Notifications */}
         <SectionHeader title="Notifications" description="Nudge preferences (max 1 per day, quiet 10pm-8am)" />

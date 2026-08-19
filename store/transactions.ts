@@ -21,7 +21,7 @@ export interface Transaction {
   description: string | null
   bucketId: string
   date: string
-  source: 'manual' | 'ocr' | 'overlay'
+  source: 'manual' | 'ocr' | 'overlay' | 'notification'
   remarks: string | null
   fundedFromBucketId: string | null
   parsedTxnId: string | null

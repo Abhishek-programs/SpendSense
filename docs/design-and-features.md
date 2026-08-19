@@ -23,8 +23,8 @@ Headers use safe-area inset (`insets.top + 12`) on all tabs.
 ### Your money card (collapsed default)
 | Collapsed | Expanded |
 |-----------|----------|
-| **available balance** | **intentional savings** + breakdown (EF, goals, SIP, Shares) |
-| | Remaining this month + carried-forward if > 0 |
+| **Your money** — cash on you now | Remaining this month · carried-forward · not-yet-confirmed (still in bank) |
+| | **Net worth** — confirmed EF, goals, SIP, shares |
 
 Net worth accordion: **Lent out** (asset) · **You owe** (liability).
 
@@ -90,7 +90,7 @@ Personal: balance vs cap. Section subtitle: **Ceilings & personal fund**.
 
 ## Settings
 
-Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · notifications · CSV export · reset all data
+Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · **payment helper** (eSewa / nBank) · notifications · CSV export · reset all data
 
 ---
 
@@ -111,6 +111,8 @@ Playbook (income, month start, EF floor, age) · buckets · keywords · sure-sho
 effectiveIncome      = salary txn amount if confirmed this month else 0
 safeToSpend          = spendingPlan - lifestyleSpent - personalDraws + max(0, effectiveIncome - totalAllocations)
 availableBalance     = max(0, safeToSpend) + carriedForwardBalance
+yourMoney            = availableBalance + stillInBank
+stillInBank          = salary confirmed ? max(0, plannedSavings - confirmedSavedInvested) : 0
 efFloor              = coreLiving × 6
 suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
 ```
@@ -136,4 +138,5 @@ suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
 | Full-app design polish | Shipped |
 | Description field + word categorize | Shipped |
 | Manual entry (expense / income / lend-borrow) | Shipped |
+| Payment helper (usage access + reply notification) | Shipped (dev client) |
 | Recurring drafts | Not shipped |

@@ -11,45 +11,27 @@ import { formatNPRShort } from '@/lib/format'
 
 
 interface YourMoneyCardProps {
-
   availableBalance: number
-
+  stillInBank?: number
   intentionalSavings: number
-
   monthRemainingBalance: number
-
   carriedForwardBalance: number
-
   breakdown?: { label: string; value: number }[]
-
   lentOutAsset?: number
-
   youOweLiability?: number
-
   emptyHint?: string
-
 }
 
-
-
 export function NetWorthCard({
-
   availableBalance,
-
+  stillInBank = 0,
   intentionalSavings,
-
   monthRemainingBalance,
-
   carriedForwardBalance,
-
   breakdown = [],
-
   lentOutAsset = 0,
-
   youOweLiability = 0,
-
   emptyHint,
-
 }: YourMoneyCardProps) {
 
   const [expanded, setExpanded] = useState(false)
@@ -80,11 +62,15 @@ export function NetWorthCard({
 
           <Text style={styles.sub}>
 
-            {carriedForwardBalance > 0
+            {stillInBank > 0
 
-              ? `Includes NPR ${formatNPRShort(carriedForwardBalance)} carried forward`
+              ? `Includes NPR ${formatNPRShort(stillInBank)} not yet confirmed`
 
-              : 'Available this month'}
+              : carriedForwardBalance > 0
+
+                ? `Includes NPR ${formatNPRShort(carriedForwardBalance)} carried forward`
+
+                : 'Cash on you right now'}
 
           </Text>
 
@@ -139,6 +125,26 @@ export function NetWorthCard({
                 {formatNPRShort(carriedForwardBalance)}
 
               </Text>
+
+            </View>
+
+          )}
+
+
+
+          {stillInBank > 0 && (
+
+            <View style={styles.breakdownRow}>
+
+              <View>
+
+                <Text style={styles.breakdownLabel}>Not yet confirmed</Text>
+
+                <Text style={styles.rolloverNote}>Still in bank — confirm in Future</Text>
+
+              </View>
+
+              <Text style={styles.breakdownValue}>{formatNPRShort(stillInBank)}</Text>
 
             </View>
 

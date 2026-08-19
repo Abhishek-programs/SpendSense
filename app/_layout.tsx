@@ -1,5 +1,6 @@
 import '../global.css'
 import { useEffect, useState } from 'react'
+import { AppState } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { StatusBar, setStatusBarStyle } from 'expo-status-bar'
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter'
@@ -21,6 +22,7 @@ import {
 } from '@/lib/notifications'
 import { runMonthRollover } from '@/lib/bucket-balance'
 import { runSurplusRollover } from '@/lib/month-surplus'
+import { startPaymentWatchIfEnabled } from '@/lib/payment-watch'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -90,7 +92,20 @@ export default function RootLayout() {
     setLastNotificationDate(pb.lastNotificationDate)
     setupNotificationChannel()
     requestPermissions()
+    startPaymentWatchIfEnabled()
   }, [playbookLoaded, isOnboarded])
+
+  useEffect(() => {
+    if (!playbookLoaded || !isOnboarded) return
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return
+      const pb = usePlaybookStore.getState()
+      const { start, end } = getMonthRange(pb.monthStartDay)
+      loadTransactions(start, end)
+      startPaymentWatchIfEnabled()
+    })
+    return () => sub.remove()
+  }, [playbookLoaded, isOnboarded, loadTransactions])
 
   // Check and schedule nudges when transactions/buckets are loaded
   useEffect(() => {

@@ -45,7 +45,8 @@
           "icon": "./assets/icon.png",
           "color": "#16A34A"
         }
-      ]
+      ],
+      "./plugins/withPaymentWatch.js"
     ],
     "extra": {
       "router": {},
