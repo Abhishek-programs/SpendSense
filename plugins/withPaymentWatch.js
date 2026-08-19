@@ -31,6 +31,19 @@ function withPaymentWatch(config) {
           .join(pkg)
         fs.writeFileSync(path.join(destDir, file), contents)
       }
+      const resSrc = path.join(srcDir, 'res')
+      if (fs.existsSync(resSrc)) {
+        const copyDir = (from, to) => {
+          fs.mkdirSync(to, { recursive: true })
+          for (const name of fs.readdirSync(from)) {
+            const s = path.join(from, name)
+            const d = path.join(to, name)
+            if (fs.statSync(s).isDirectory()) copyDir(s, d)
+            else fs.copyFileSync(s, d)
+          }
+        }
+        copyDir(resSrc, path.join(cfg.modRequest.platformProjectRoot, 'app/src/main/res'))
+      }
       return cfg
     },
   ])

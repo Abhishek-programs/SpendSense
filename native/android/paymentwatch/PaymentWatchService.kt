@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import {{PACKAGE}}.R
 
 class PaymentWatchService : Service() {
   private val handler = Handler(Looper.getMainLooper())
@@ -190,7 +191,7 @@ class PaymentWatchService : Service() {
 
   private fun placeholderNotification(): Notification {
     return NotificationCompat.Builder(this, CHANNEL_IDLE)
-      .setSmallIcon(android.R.drawable.ic_dialog_info)
+      .setSmallIcon(R.drawable.ic_stat_spendsense)
       .setContentTitle("SpendSense")
       .setContentText("Payment helper")
       .setOngoing(true)
@@ -230,7 +231,7 @@ class PaymentWatchService : Service() {
     ).addRemoteInput(bucketInput).build()
 
     return NotificationCompat.Builder(this, CHANNEL_LOG)
-      .setSmallIcon(android.R.drawable.ic_dialog_info)
+      .setSmallIcon(R.drawable.ic_stat_spendsense)
       .setContentTitle(title)
       .setContentText("Tap a bucket")
       .setOngoing(true)
@@ -261,7 +262,7 @@ class PaymentWatchService : Service() {
     ).addRemoteInput(amountInput).build()
 
     return NotificationCompat.Builder(this, CHANNEL_LOG)
-      .setSmallIcon(android.R.drawable.ic_dialog_info)
+      .setSmallIcon(R.drawable.ic_stat_spendsense)
       .setContentTitle("Log $label payment")
       .setContentText("Amount then a name, e.g. 200 momo")
       .setOngoing(true)
@@ -302,7 +303,7 @@ class PaymentWatchService : Service() {
       val nm = context.getSystemService(NotificationManager::class.java) ?: return
       PaymentWatchPrefs.holdCancelUntil(context, System.currentTimeMillis() + 2500)
       val done = NotificationCompat.Builder(context, CHANNEL_LOG)
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setSmallIcon(R.drawable.ic_stat_spendsense)
         .setContentTitle("Saved")
         .setContentText("Bucket updated")
         .setRemoteInputHistory(arrayOf("Saved"))
