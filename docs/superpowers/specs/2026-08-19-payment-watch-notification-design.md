@@ -8,22 +8,15 @@
 
 No MediaProjection, no screenshot, no SYSTEM_ALERT_WINDOW overlay, no Accessibility service.
 
-Detect eSewa / nBank via **Usage access** (`UsageStatsManager`). Show an **ongoing notification** with **RemoteInput** for amount. Insert a flagged expense into `spendsense.db` from native code. User assigns a bucket on next app open (`FlaggedTransactionPrompt`).
+## Flow
 
-## Apps (default)
+1. Watcher runs in the background **without** a persistent “helper on” notification.  
+2. After eSewa/nBank has been in the foreground for **5 seconds**: amount + Log.  
+3. After Log: bucket chips (native RemoteInput choices). Tap a chip to assign.  
+4. After bucket (or amount-only if no chips): no log again until you **leave** that payment app. Re-open → 5 second delay again.
 
-| Label | Package |
-|-------|---------|
-| eSewa | `com.f1soft.esewa`, `com.esewa` |
-| nBank (Nabil) | `com.f1soft.nabilmbank` |
-
-## Permissions
-
-- `PACKAGE_USAGE_STATS` (granted in system Usage access screen)
-- `POST_NOTIFICATIONS`
-- `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_SPECIAL_USE`
-- `RECEIVE_BOOT_COMPLETED`
+Android still requires a brief FGS handshake when the service starts; it is dismissed immediately if you are not in a payment app.
 
 ## Save
 
-Expense, amount from the reply, merchant = eSewa or nBank, `bucket_id` = playbook fallback or `core-living`, `is_flagged = 1`, `source = notification`.
+Amount insert is flagged. Chip tap sets `bucket_id` and `is_flagged = 0`.

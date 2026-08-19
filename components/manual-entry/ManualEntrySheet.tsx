@@ -386,7 +386,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                 )}
 
                 <View style={styles.section}>
-                  <Text style={styles.label}>Description</Text>
+                  <Text style={styles.label}>Title</Text>
                   <TextInput
                     style={styles.textInput}
                     value={description}
@@ -397,12 +397,12 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                 </View>
 
                 <View style={styles.section}>
-                  <Text style={styles.label}>Merchant (optional)</Text>
+                  <Text style={styles.label}>Description (optional)</Text>
                   <TextInput
                     style={styles.textInput}
                     value={merchant}
                     onChangeText={setMerchant}
-                    placeholder="e.g. Bhat-Bhateni, NTC"
+                    placeholder="Extra detail if you want"
                     placeholderTextColor={colors.textMuted}
                   />
                 </View>

@@ -28,7 +28,7 @@ Monthly take-home (playbook)
 
 **Buckets** — monthly amounts, types (`spending` | `savings` | `investment`). Regular spending resets each month. **Personal** accumulates with top-up + cap.
 
-**Transactions** — amount, date, bucket, **description** (user label), merchant, remarks, source, optional flag.
+**Transactions** — amount, date, bucket, **title** (user label), optional description, remarks, source, optional flag.
 
 **Goals** — targets with linked savings bucket(s); can complete and archive.
 

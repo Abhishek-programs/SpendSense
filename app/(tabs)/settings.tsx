@@ -368,7 +368,7 @@ function PaymentWatchCard() {
               <>
                 <View style={styles.divider} />
                 <Text style={styles.sectionDesc}>
-                  A quiet notification stays while this is on. When eSewa or nBank is in front, it becomes a reply field for NPR. No screenshot, no overlay, no accessibility service.
+                  A notification appears about 5 seconds after eSewa or nBank is open. After you log and pick a bucket, it stays gone until you leave that app.
                 </Text>
               </>
             )}

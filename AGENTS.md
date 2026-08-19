@@ -116,7 +116,7 @@ Never auto-memorize ambiguous merchants.
 
 **Nudges:** max 1/day, quiet 10pm–8am (`lib/notifications.ts`).
 
-**Payment helper:** Optional. Usage access + reply notification while eSewa (`com.f1soft.esewa`) or nBank (`com.f1soft.nabilmbank`) is in the foreground. Amount-only, always flagged, category on next open. No screenshot, overlay, or Accessibility. See `docs/superpowers/specs/2026-08-19-payment-watch-notification-design.md`.
+**Payment helper:** Optional. Usage access + amount notification while eSewa / nBank is in the foreground; after Log, a second notification with spending-bucket chips for that txn. No screenshot, overlay, or Accessibility. See `docs/superpowers/specs/2026-08-19-payment-watch-notification-design.md`.
 
 **Funded-from savings:** When logging a contribution to a savings/investment bucket, optional `fundedFromBucketId` uses that Living/Personal ceiling or fund; destination still gets `__savings_confirm__`. See `docs/superpowers/specs/2026-07-26-living-ceilings-funded-from-design.md`.
 

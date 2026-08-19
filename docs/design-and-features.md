@@ -61,7 +61,7 @@ Animated checkmark on confirm; progress bars animate fill width.
 
 ## Ledger
 
-List / Chart toggle · filters (including **Lending**) · flagged amber border · **description** as main line, merchant as subtitle when different.
+List / Chart toggle · filters (including **Lending**) · flagged amber border · **title** as main line, description as subtitle when different.
 
 **Charts:** sentence-case section titles · `FadeIn` on cards · six-month trend bars with top NPR labels (`overflowTop` / extra card padding so labels aren't clipped) · softer bar radii · non-current trend months at lower green opacity.
 
@@ -76,7 +76,7 @@ Goal cards use softened shadows; list rows stagger in with `FadeInDown`.
 
 ## Manual Entry
 
-Field order: **Amount** (auto-focus) → Bucket → **Funded from (optional)** when bucket is savings/investment → **Description** → Merchant → Notes (hidden for savings confirms) → Date.  
+Field order: **Amount** (auto-focus) → Bucket → **Funded from (optional)** when bucket is savings/investment → **Title** → Description (optional) → Notes (hidden for savings confirms) → Date.  
 Modes: Expense / Income / Lend-Borrow. Savings/investment destinations save as `__savings_confirm__`; optional funded-from debits that Living ceiling or Personal fund.
 
 ---

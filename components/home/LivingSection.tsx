@@ -131,7 +131,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerRow: {
-    paddingHorizontal: 16,
     marginBottom: 10,
   },
   title: {
@@ -150,8 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   divider: {
     height: 1,
