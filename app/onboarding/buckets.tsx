@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -7,9 +7,8 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
-  KeyboardAvoidingView,
   Platform,
-  Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -18,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '@/constants/colors'
 import { useBucketsStore, Bucket } from '@/store/buckets'
 import { usePlaybookStore } from '@/store/playbook'
-import { useGoalsStore } from '@/store/goals'
 import { formatNPR } from '@/lib/format'
 import {
   isNonRemovableBucket,
@@ -27,9 +25,10 @@ import {
   CORE_LIVING_BUCKET_ID,
   EF_BUCKET_ID,
   PERSONAL_BUCKET_ID,
+  GOAL_POOL_BUCKET_ID,
 } from '@/constants/defaults'
 import { OnboardingBack } from '@/components/onboarding/OnboardingBack'
-import { GOAL_BUCKET_LABELS } from '@/lib/goals/plan'
+import { useScrollFocusedToTop } from '@/hooks/useKeyboardHeight'
 
 interface BucketDraft {
   id: string
@@ -45,10 +44,11 @@ interface BucketDraft {
 }
 
 export default function OnboardingBucketsScreen() {
-  const { buckets, updateBucket, loadBuckets } = useBucketsStore()
+  const { buckets, updateBucket, loadBuckets, ensureGoalPoolBucket } = useBucketsStore()
   const { monthlyIncome } = usePlaybookStore()
-  const { goals, setGoalEnabled, loadGoals } = useGoalsStore()
   const insets = useSafeAreaInsets()
+  const { keyboardHeight, scrollRef, scrollHostRef, onInputFocus, onScroll } =
+    useScrollFocusedToTop()
 
   const [drafts, setDrafts] = useState<BucketDraft[]>(() =>
     buckets.map(b => ({
@@ -65,55 +65,53 @@ export default function OnboardingBucketsScreen() {
     })),
   )
   const [initialized, setInitialized] = useState(false)
-  const [keyboardPadding, setKeyboardPadding] = useState(0)
-  const scrollRef = useRef<ScrollView>(null)
-  const fieldOffsets = useRef<Record<string, number>>({})
-
-  const scrollToField = (key: string) => {
-    const y = fieldOffsets.current[key]
-    if (y == null) return
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, y - 48), animated: true })
-    }, Platform.OS === 'ios' ? 250 : 100)
-  }
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardPadding(e.endCoordinates.height),
-    )
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardPadding(0),
-    )
-    return () => {
-      show.remove()
-      hide.remove()
-    }
-  }, [])
 
   useFocusEffect(
     useCallback(() => {
-      void loadGoals()
-      void loadBuckets()
-    }, [loadGoals, loadBuckets]),
+      void (async () => {
+        await ensureGoalPoolBucket()
+        await loadBuckets()
+      })()
+    }, [ensureGoalPoolBucket, loadBuckets]),
   )
 
   const takeHome = monthlyIncome
 
   const allocated = useMemo(() => {
     return drafts
-      .filter(d => d.isActive)
+      .filter(d => d.isActive && !d.linkedGoalId)
       .reduce((sum, d) => sum + (parseInt(d.monthlyAmount, 10) || 0), 0)
   }, [drafts])
 
   const remaining = takeHome - allocated
   const overAllocated = remaining < 0
 
-  const enabledGoals = goals.filter(g => g.isEnabled)
+  useEffect(() => {
+    setDrafts(prev => {
+      const ids = new Set(prev.map(d => d.id))
+      const extras = buckets.filter(b => !ids.has(b.id) && !b.linkedGoalId)
+      if (extras.length === 0) return prev
+      return [
+        ...prev,
+        ...extras.map(b => ({
+          id: b.id,
+          name: b.name,
+          icon: b.icon,
+          type: b.type,
+          monthlyAmount: String(b.monthlyAmount),
+          accumulationCap: b.accumulationCap != null ? String(b.accumulationCap) : '20000',
+          accumulates: b.accumulates ?? false,
+          isActive: b.isActive,
+          linkedGoalId: b.linkedGoalId ?? null,
+          goalBucketRole: b.goalBucketRole ?? null,
+        })),
+      ]
+    })
+  }, [buckets])
 
   useEffect(() => {
     if (initialized) return
+    if (!drafts.some(d => d.id === GOAL_POOL_BUCKET_ID)) return
     setInitialized(true)
 
     setDrafts(prev => {
@@ -121,8 +119,10 @@ export default function OnboardingBucketsScreen() {
         d => d.id === CORE_LIVING_BUCKET_ID || d.name === 'Core Living',
       )
       const ef = prev.find(d => d.id === EF_BUCKET_ID || d.name === 'Emergency Fund')
+      const pool = prev.find(d => d.id === GOAL_POOL_BUCKET_ID)
       const coreAmt = parseInt(coreLiving?.monthlyAmount ?? '50000', 10) || 50000
       const efAmt = parseInt(ef?.monthlyAmount ?? '15000', 10) || 15000
+      const poolAmt = parseInt(pool?.monthlyAmount ?? '0', 10) || 0
 
       const optionalSpending = prev
         .filter(
@@ -133,9 +133,7 @@ export default function OnboardingBucketsScreen() {
         )
         .reduce((s, d) => s + (parseInt(d.monthlyAmount, 10) || 0), 0)
 
-      const goalsMonthly = enabledGoals.reduce((s, g) => s + g.monthlyContribution, 0)
-
-      let leftover = takeHome - coreAmt - efAmt - optionalSpending - goalsMonthly
+      let leftover = takeHome - coreAmt - efAmt - optionalSpending - poolAmt
       if (leftover < 0) leftover = 0
 
       const sipDefault =
@@ -163,27 +161,28 @@ export default function OnboardingBucketsScreen() {
         return d
       })
     })
-  }, [initialized, buckets, enabledGoals, takeHome])
+  }, [initialized, drafts, buckets, takeHome])
 
   const updateDraft = (id: string, patch: Partial<BucketDraft>) => {
     setDrafts(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)))
-  }
-
-  const handleToggleGoal = async (goalId: string, enabled: boolean) => {
-    await setGoalEnabled(goalId, enabled)
-    setDrafts(prev =>
-      prev.map(d => (d.linkedGoalId === goalId ? { ...d, isActive: enabled } : d)),
-    )
   }
 
   const handleNext = async () => {
     if (overAllocated) return
 
     for (const draft of drafts) {
+      if (draft.linkedGoalId) continue
       const original = buckets.find(b => b.id === draft.id)
+      const amt = parseInt(draft.monthlyAmount, 10) || original?.monthlyAmount || 0
+      if (draft.id === GOAL_POOL_BUCKET_ID) {
+        await updateBucket(draft.id, {
+          monthlyAmount: amt,
+          isActive: true,
+        })
+        continue
+      }
       if (!original) continue
 
-      const amt = parseInt(draft.monthlyAmount, 10) || original.monthlyAmount
       const cap = draft.accumulates
         ? parseInt(draft.accumulationCap, 10) || original.accumulationCap
         : original.accumulationCap
@@ -201,7 +200,7 @@ export default function OnboardingBucketsScreen() {
         })
       }
     }
-    router.push('/onboarding/balances')
+    router.push('/onboarding/goals')
   }
 
   const spendingDrafts = drafts
@@ -212,17 +211,21 @@ export default function OnboardingBucketsScreen() {
     })
   const regularSpending = spendingDrafts.filter(d => !d.accumulates)
   const fundSpending = spendingDrafts.filter(d => d.accumulates)
-  const systemFutureDrafts = drafts.filter(
-    d => (d.type === 'savings' || d.type === 'investment') && !d.linkedGoalId,
-  )
+  const futureOrder = (id: string) => {
+    if (id === EF_BUCKET_ID) return 0
+    if (id === GOAL_POOL_BUCKET_ID) return 1
+    if (id === SIP_BUCKET_ID) return 2
+    if (id === SHARES_BUCKET_ID) return 3
+    return 4
+  }
+  const systemFutureDrafts = drafts
+    .filter(d => (d.type === 'savings' || d.type === 'investment') && !d.linkedGoalId)
+    .sort((a, b) => futureOrder(a.id) - futureOrder(b.id))
 
   const renderFundRow = (draft: BucketDraft) => (
     <View
       key={draft.id}
       style={[styles.fundCard, !draft.isActive && styles.bucketRowDisabled]}
-      onLayout={e => {
-        fieldOffsets.current[`fund-${draft.id}`] = e.nativeEvent.layout.y
-      }}
     >
       <View style={styles.fundHeader}>
         <Text style={styles.bucketIcon}>{draft.icon}</Text>
@@ -250,7 +253,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
             keyboardType="numeric"
             editable={draft.isActive}
-            onFocus={() => scrollToField(`fund-${draft.id}`)}
+            onFocus={onInputFocus}
           />
         </View>
       </View>
@@ -264,7 +267,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { accumulationCap: v })}
             keyboardType="numeric"
             editable={draft.isActive}
-            onFocus={() => scrollToField(`fund-${draft.id}`)}
+            onFocus={onInputFocus}
           />
         </View>
         <Text style={styles.fundFieldSub}>Stop adding when balance reaches this</Text>
@@ -276,9 +279,6 @@ export default function OnboardingBucketsScreen() {
     <View
       key={draft.id}
       style={[styles.bucketRow, !draft.isActive && styles.bucketRowDisabled]}
-      onLayout={e => {
-        fieldOffsets.current[`bucket-${draft.id}`] = e.nativeEvent.layout.y
-      }}
     >
       <Text style={styles.bucketIcon}>{draft.icon}</Text>
       <View style={styles.bucketInfo}>
@@ -296,7 +296,7 @@ export default function OnboardingBucketsScreen() {
             onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
             keyboardType="numeric"
             editable={draft.isActive}
-            onFocus={() => scrollToField(`bucket-${draft.id}`)}
+            onFocus={onInputFocus}
           />
         </View>
       </View>
@@ -315,75 +315,10 @@ export default function OnboardingBucketsScreen() {
     </View>
   )
 
-  const renderGoalGroup = useCallback(
-    (goal: (typeof goals)[0]) => {
-      const goalDrafts = drafts.filter(d => d.linkedGoalId === goal.id)
-      if (goalDrafts.length === 0) return null
-
-      const totalMonthly = goalDrafts
-        .filter(d => d.isActive)
-        .reduce((s, d) => s + (parseInt(d.monthlyAmount, 10) || 0), 0)
-
-      return (
-        <View key={goal.id} style={styles.goalGroup}>
-          <View style={styles.goalGroupHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.goalGroupName, !goal.isEnabled && styles.textDisabled]}>
-                {goal.name}
-              </Text>
-              <Text style={styles.goalGroupTotal}>
-                NPR {formatNPR(totalMonthly)}/mo total
-              </Text>
-            </View>
-            <Switch
-              value={goal.isEnabled}
-              onValueChange={v => handleToggleGoal(goal.id, v)}
-              trackColor={{ false: colors.border, true: colors.green + '50' }}
-              thumbColor={goal.isEnabled ? colors.green : colors.textMuted}
-            />
-          </View>
-          {goal.isEnabled &&
-            goalDrafts.map(draft => {
-              const role = draft.goalBucketRole
-              const label = role ? GOAL_BUCKET_LABELS[role].title : draft.name
-              const hint = role ? GOAL_BUCKET_LABELS[role].hint : undefined
-              return (
-                <View key={draft.id} style={styles.goalSubRow}>
-                  <View style={styles.goalSubIndent} />
-                  <View style={[styles.bucketRow, styles.goalSubBucket, !draft.isActive && styles.bucketRowDisabled]}>
-                    <View style={styles.bucketInfo}>
-                      <Text style={[styles.bucketName, !draft.isActive && styles.textDisabled]}>{label}</Text>
-                      {hint && <Text style={styles.bucketHint}>{hint}</Text>}
-                      <View style={styles.amountRow}>
-                        <Text style={styles.prefix}>NPR</Text>
-                        <TextInput
-                          style={[styles.amountInput, !draft.isActive && styles.textDisabled]}
-                          value={draft.monthlyAmount}
-                          onChangeText={v => updateDraft(draft.id, { monthlyAmount: v })}
-                          keyboardType="numeric"
-                          editable={draft.isActive}
-                          onFocus={() => scrollToField(`bucket-${draft.id}`)}
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              )
-            })}
-          {!goal.isEnabled && (
-            <Text style={styles.goalPaused}>Paused — enable when income allows</Text>
-          )}
-        </View>
-      )
-    },
-    [drafts, goals],
-  )
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.meter, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
         <View style={styles.meterTop}>
@@ -408,13 +343,15 @@ export default function OnboardingBucketsScreen() {
         </View>
       </View>
 
+      <View ref={scrollHostRef} style={{ flex: 1 }} collapsable={false}>
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + keyboardPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardHeight }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        automaticallyAdjustKeyboardInsets
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         <Text style={styles.subtitle}>
           Allocate your take-home across spending and savings. Core Living and EF are locked.
@@ -427,11 +364,10 @@ export default function OnboardingBucketsScreen() {
 
           <Text style={[styles.groupLabel, { marginTop: 24 }]}>SAVINGS & INVESTMENTS</Text>
 
-          {goals.map(g => renderGoalGroup(g))}
-
           {systemFutureDrafts.map(draft => renderBucketRow(draft))}
         </Animated.View>
       </ScrollView>
+      </View>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity

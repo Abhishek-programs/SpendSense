@@ -1,6 +1,6 @@
 # SpendSense
 
-Personal finance tracker for Android — NPR, bucket-based playbook, receipt OCR, goals.
+Personal finance tracker for Android — NPR, bucket-based playbook, manual entry, goals.
 
 ## Setup
 
@@ -10,7 +10,7 @@ cp .env.example .env
 npx expo start
 ```
 
-Press `a` for Android emulator. **OCR and native overlay need a dev client** — see [AGENTS.md](./AGENTS.md).
+Press `a` for Android emulator, or use a development build: `npx expo run:android` — see [AGENTS.md](./AGENTS.md).
 
 ## Docs
 
@@ -28,5 +28,3 @@ After clone:
 ```bash
 npx skills experimental_install
 ```
-
-Project skill: `.claude/skills/spendsense/` (committed).

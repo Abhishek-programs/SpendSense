@@ -11,7 +11,7 @@
 Home | Ledger | [+ FAB] | Vault | Settings
 ```
 
-Center **green FAB** → Manual Entry / Scan Receipt (not a tab).
+Center **green FAB** → Manual Entry (not a tab).
 
 ---
 
@@ -76,22 +76,21 @@ Goal cards use softened shadows; list rows stagger in with `FadeInDown`.
 
 ## Manual Entry
 
-Field order: **Amount** (auto-focus) → Bucket → **Description** → Merchant (optional, OCR)  
-Manual: remarks empty. OCR: merchant + remarks from receipt.
+Field order: **Amount** (auto-focus) → Bucket → **Funded from (optional)** when bucket is savings/investment → **Description** → Merchant → Notes (hidden for savings confirms) → Date.  
+Modes: Expense / Income / Lend-Borrow. Savings/investment destinations save as `__savings_confirm__`; optional funded-from debits that Living ceiling or Personal fund.
+
+---
+
+## Living
+
+Regular rows: **Spent NPR X** primary, muted **ceiling NPR Y** secondary (not `X / Y` as a spend target).  
+Personal: balance vs cap. Section subtitle: **Ceilings & personal fund**.
 
 ---
 
 ## Settings
 
-Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · notifications · **Scan Bubble** (Android) · CSV export · reset all data
-
-### Scan Bubble (Android, dev client)
-
-Requires overlay + app usage + screen capture permissions. See [overlay-v2.md](./overlay-v2.md).
-
-- Toggle enables draggable green bubble over **whitelisted banking apps** only
-- Tap → silent screenshot → headless OCR → auto-save transaction (`source: overlay`)
-- Default targets: eSewa, Khalti, Chrome (editable in `constants/overlay-targets.ts`)
+Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · notifications · CSV export · reset all data
 
 ---
 
@@ -100,8 +99,8 @@ Requires overlay + app usage + screen capture permissions. See [overlay-v2.md](.
 1. Name  
 2. Money — take-home, **cash on hand**, month start, age (optional)  
 3. Foundations — **Core Living** → EF target = 6× that, current EF balance  
-4. Goals — slider locks after Apply  
-5. Bucket builder — income meter, spending + Personal + goals + EF/SIP/Shares  
+4. Bucket builder — income meter, spending + Personal + EF + **Saving towards goal** pool + SIP/Shares  
+5. Goals — split the pool across one or more purchases (monthlies must sum to the pool)  
 6. Starting balances — SIP + Shares to date  
 
 ---
@@ -136,5 +135,5 @@ suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
 | Lent & borrowed (person ledger, ring slice, net worth) | Shipped |
 | Full-app design polish | Shipped |
 | Description field + word categorize | Shipped |
-| Gallery OCR + scan bubble overlay (Kotlin, headless JS OCR — dev client) | Shipped, device testing |
+| Manual entry (expense / income / lend-borrow) | Shipped |
 | Recurring drafts | Not shipped |

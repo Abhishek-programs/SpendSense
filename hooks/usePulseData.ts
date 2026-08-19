@@ -46,11 +46,11 @@ export function usePulseData() {
       transactions
         .filter(
           t =>
-            t.bucketId === b.id &&
             t.type === 'expense' &&
             !t.isFlagged &&
             !t.isRecurringDraft &&
-            (!t.remarks || !t.remarks.startsWith('__')),
+            ((t.bucketId === b.id && (!t.remarks || !t.remarks.startsWith('__'))) ||
+              (t.fundedFromBucketId === b.id && t.remarks === '__savings_confirm__')),
         )
         .reduce((sum, t) => sum + t.amount, 0)
     )

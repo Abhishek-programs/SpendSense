@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Switch,
-  Platform,
   Alert,
   StyleSheet,
   Pressable,
@@ -38,7 +37,6 @@ import {
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
 import { useLendingStore } from '@/store/lending'
-import { Overlay, isOverlayAvailable } from '@/lib/overlay'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
 
@@ -71,6 +69,7 @@ function EditableRow({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [justSaved, setJustSaved] = useState(false)
+  const skipBlurSave = useRef(false)
 
   const startEdit = () => {
     if (editing) return
@@ -79,6 +78,10 @@ function EditableRow({
   }
 
   const save = () => {
+    if (skipBlurSave.current) {
+      skipBlurSave.current = false
+      return
+    }
     const num = parseInt(draft, 10)
     if (!isNaN(num) && num >= 0 && num !== value) {
       onSave(num)
@@ -89,13 +92,21 @@ function EditableRow({
     setEditing(false)
   }
 
+  const reset = () => {
+    skipBlurSave.current = true
+    setDraft(String(value))
+    setTimeout(() => {
+      skipBlurSave.current = false
+    }, 300)
+  }
+
   return (
     <TouchableOpacity onPress={startEdit} style={styles.editableRow} activeOpacity={0.6}>
       <Text style={styles.editableLabel}>{label}</Text>
       {editing ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={save} hitSlop={12}>
-            <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
+          <TouchableOpacity onPressIn={reset} hitSlop={12}>
+            <Text style={{ color: colors.textMuted, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Reset</Text>
           </TouchableOpacity>
           <TextInput
             style={styles.editableInput}
@@ -103,6 +114,7 @@ function EditableRow({
             onChangeText={setDraft}
             keyboardType={keyboardType}
             onSubmitEditing={save}
+            onBlur={save}
             autoFocus
             selectTextOnFocus
           />
@@ -137,6 +149,7 @@ function EditableStringRow({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [justSaved, setJustSaved] = useState(false)
+  const skipBlurSave = useRef(false)
 
   const startEdit = () => {
     if (editing) return
@@ -145,6 +158,10 @@ function EditableStringRow({
   }
 
   const save = () => {
+    if (skipBlurSave.current) {
+      skipBlurSave.current = false
+      return
+    }
     const trimmed = draft.trim()
     if (trimmed && trimmed !== value) {
       onSave(trimmed)
@@ -155,19 +172,28 @@ function EditableStringRow({
     setEditing(false)
   }
 
+  const reset = () => {
+    skipBlurSave.current = true
+    setDraft(value)
+    setTimeout(() => {
+      skipBlurSave.current = false
+    }, 300)
+  }
+
   return (
     <TouchableOpacity onPress={startEdit} style={styles.editableRow} activeOpacity={0.6}>
       <Text style={styles.editableLabel}>{label}</Text>
       {editing ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={save} hitSlop={12}>
-            <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
+          <TouchableOpacity onPressIn={reset} hitSlop={12}>
+            <Text style={{ color: colors.textMuted, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Reset</Text>
           </TouchableOpacity>
           <TextInput
             style={[styles.editableInput, { textAlign: 'right' }]}
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={save}
+            onBlur={save}
             placeholder={placeholder}
             autoCapitalize="words"
             autoFocus
@@ -267,6 +293,12 @@ export default function SettingsScreen() {
     type: 'spending' as Bucket['type'],
     showOnHome: true,
   })
+  const bucketDraftRef = useRef(bucketDraft)
+  bucketDraftRef.current = bucketDraft
+  const skipBucketBlurPersist = useRef(false)
+  const [focusedBucketField, setFocusedBucketField] = useState<
+    'name' | 'monthlyAmount' | 'accumulationCap' | null
+  >(null)
 
   // Add bucket state
   const [addingBucket, setAddingBucket] = useState(false)
@@ -284,55 +316,97 @@ export default function SettingsScreen() {
 
   // Notification toggles — synced to playbook store
   const [nudges, setNudges] = useState(pb.nudgeToggles)
-  const [overlayPerm, setOverlayPerm] = useState(false)
-  const [usagePerm, setUsagePerm] = useState(false)
-  const [mediaReady, setMediaReady] = useState(false)
-  const [bubbleEnabled, setBubbleEnabled] = useState(false)
 
-  useEffect(() => {
-    if (!isOverlayAvailable()) return
-    Promise.all([
-      Overlay.isPermissionGranted(),
-      Overlay.checkUsagePermission(),
-    ]).then(([overlay, usage]) => {
-      setOverlayPerm(overlay)
-      setUsagePerm(usage)
-    })
-  }, [])
+  const draftFromBucket = (b: Bucket) => ({
+    name: b.name,
+    monthlyAmount: String(b.monthlyAmount),
+    accumulationCap: b.accumulationCap != null ? String(b.accumulationCap) : '',
+    type: b.type,
+    showOnHome: b.showOnHome,
+  })
 
-  const expandBucket = (b: Bucket) => {
-    if (expandedBucketId === b.id) {
-      setExpandedBucketId(null)
-      return
-    }
-    setExpandedBucketId(b.id)
-    setBucketDraft({
-      name: b.name,
-      monthlyAmount: String(b.monthlyAmount),
-      accumulationCap: b.accumulationCap != null ? String(b.accumulationCap) : '',
-      type: b.type,
-      showOnHome: b.showOnHome,
-    })
-  }
-
-  const saveBucketEdit = async (id: string) => {
-    const amt = parseInt(bucketDraft.monthlyAmount, 10)
-    if (!bucketDraft.name.trim() || isNaN(amt) || amt < 0) return
+  const persistBucketDraft = async (
+    id: string,
+    draft = bucketDraftRef.current,
+  ) => {
     const bucket = bs.buckets.find(x => x.id === id)
+    if (!bucket) return
+    const amt = parseInt(draft.monthlyAmount, 10)
+    if (!draft.name.trim() || isNaN(amt) || amt < 0) return
     const patch: Partial<Bucket> = {
-      name: bucketDraft.name.trim(),
+      name: draft.name.trim(),
       monthlyAmount: amt,
-      type: bucketDraft.type,
-      showOnHome: bucketDraft.showOnHome,
+      type: draft.type,
+      showOnHome: draft.showOnHome,
     }
-    if (bucket?.accumulates) {
-      const cap = parseInt(bucketDraft.accumulationCap, 10)
+    if (bucket.accumulates) {
+      const cap = parseInt(draft.accumulationCap, 10)
       if (!isNaN(cap) && cap > 0) {
         patch.accumulationCap = cap
       }
     }
+    const unchanged =
+      patch.name === bucket.name &&
+      patch.monthlyAmount === bucket.monthlyAmount &&
+      patch.type === bucket.type &&
+      patch.showOnHome === bucket.showOnHome &&
+      (!bucket.accumulates || patch.accumulationCap === bucket.accumulationCap)
+    if (unchanged) return
     await bs.updateBucket(id, patch)
-    setExpandedBucketId(null)
+    saved.show()
+  }
+
+  const expandBucket = async (b: Bucket) => {
+    if (expandedBucketId && expandedBucketId !== b.id) {
+      await persistBucketDraft(expandedBucketId)
+    }
+    if (expandedBucketId === b.id) {
+      await persistBucketDraft(b.id)
+      setExpandedBucketId(null)
+      setFocusedBucketField(null)
+      return
+    }
+    setExpandedBucketId(b.id)
+    setFocusedBucketField(null)
+    setBucketDraft(draftFromBucket(b))
+  }
+
+  const onBucketFieldBlur = (id: string) => {
+    if (skipBucketBlurPersist.current) {
+      skipBucketBlurPersist.current = false
+      return
+    }
+    setFocusedBucketField(null)
+    void persistBucketDraft(id)
+  }
+
+  const resetBucketField = (b: Bucket) => {
+    skipBucketBlurPersist.current = true
+    const existing = draftFromBucket(b)
+    if (focusedBucketField === 'name') {
+      setBucketDraft(d => ({ ...d, name: existing.name }))
+    } else if (focusedBucketField === 'monthlyAmount') {
+      setBucketDraft(d => ({ ...d, monthlyAmount: existing.monthlyAmount }))
+    } else if (focusedBucketField === 'accumulationCap') {
+      setBucketDraft(d => ({ ...d, accumulationCap: existing.accumulationCap }))
+    } else {
+      setBucketDraft(existing)
+    }
+    setTimeout(() => {
+      skipBucketBlurPersist.current = false
+    }, 300)
+  }
+
+  const applyBucketType = (id: string, type: Bucket['type']) => {
+    const next = { ...bucketDraftRef.current, type }
+    setBucketDraft(next)
+    void persistBucketDraft(id, next)
+  }
+
+  const applyBucketShowOnHome = (id: string, showOnHome: boolean) => {
+    const next = { ...bucketDraftRef.current, showOnHome }
+    setBucketDraft(next)
+    void persistBucketDraft(id, next)
   }
 
   const confirmDeactivate = (b: Bucket) => {
@@ -388,33 +462,6 @@ export default function SettingsScreen() {
     Alert.alert('CSV Export', `${rows.length} transactions exported.\n\n${csv.slice(0, 500)}${csv.length > 500 ? '...' : ''}`)
   }
 
-  const handleToggleBubble = async (enabled: boolean) => {
-    if (!isOverlayAvailable()) {
-      Alert.alert('Not available', 'Bubble overlay requires a dev client build with native BubbleModule.')
-      return
-    }
-    try {
-      if (enabled) {
-        if (!overlayPerm || !usagePerm) {
-          Alert.alert('Permissions required', 'Grant overlay and app usage access first.')
-          return
-        }
-        if (!mediaReady) {
-          await Overlay.requestMediaProjection()
-          setMediaReady(true)
-        }
-        await Overlay.start()
-        setBubbleEnabled(true)
-      } else {
-        await Overlay.stop()
-        setBubbleEnabled(false)
-      }
-    } catch (e: any) {
-      Alert.alert('Overlay error', e?.message ?? 'Could not toggle bubble')
-      setBubbleEnabled(false)
-    }
-  }
-
   const handleClearAllData = () => {
     Alert.alert(
       'Clear All Data',
@@ -455,6 +502,75 @@ export default function SettingsScreen() {
       ],
     )
   }
+
+  const renderExistingBucketEditor = (b: Bucket) => (
+    <View style={styles.bucketEditor}>
+      <TextInput
+        style={styles.input}
+        value={bucketDraft.name}
+        onChangeText={v => setBucketDraft(d => ({ ...d, name: v }))}
+        onFocus={() => setFocusedBucketField('name')}
+        onBlur={() => onBucketFieldBlur(b.id)}
+        placeholder="Name"
+        placeholderTextColor={colors.textMuted}
+      />
+      <TextInput
+        style={[styles.input, { marginTop: 8 }]}
+        value={bucketDraft.monthlyAmount}
+        onChangeText={v => setBucketDraft(d => ({ ...d, monthlyAmount: v }))}
+        onFocus={() => setFocusedBucketField('monthlyAmount')}
+        onBlur={() => onBucketFieldBlur(b.id)}
+        keyboardType="numeric"
+        placeholder={b.accumulates ? 'Monthly top-up' : 'Monthly amount'}
+        placeholderTextColor={colors.textMuted}
+      />
+      {b.accumulates && (
+        <>
+          <Text style={[styles.fieldHint, { marginTop: 8 }]}>
+            Current balance: NPR {formatNPR(bs.getBucketBalance(b.id))}
+          </Text>
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            value={bucketDraft.accumulationCap}
+            onChangeText={v => setBucketDraft(d => ({ ...d, accumulationCap: v }))}
+            onFocus={() => setFocusedBucketField('accumulationCap')}
+            onBlur={() => onBucketFieldBlur(b.id)}
+            keyboardType="numeric"
+            placeholder="Max balance cap"
+            placeholderTextColor={colors.textMuted}
+          />
+          <Text style={styles.fieldHint}>Disabling stops top-ups; balance is kept.</Text>
+        </>
+      )}
+      <View style={styles.typeRow}>
+        {BUCKET_TYPES.map(t => (
+          <Pressable
+            key={t}
+            onPress={() => applyBucketType(b.id, t)}
+            style={[styles.typeChip, bucketDraft.type === t && { backgroundColor: colors.green }]}
+          >
+            <Text style={[styles.typeChipText, bucketDraft.type === t && { color: '#fff' }]}>
+              {t}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={[styles.toggleRow, { marginTop: 12 }]}>
+        <Text style={styles.editableLabel}>Show on Home Screen</Text>
+        <Switch
+          value={bucketDraft.showOnHome}
+          onValueChange={v => applyBucketShowOnHome(b.id, v)}
+          trackColor={{ false: colors.border, true: colors.greenFill }}
+          thumbColor={bucketDraft.showOnHome ? colors.green : '#f4f3f4'}
+        />
+      </View>
+      <View style={styles.editorActions}>
+        <TouchableOpacity onPressIn={() => resetBucketField(b)} hitSlop={12}>
+          <Text style={{ color: colors.textMuted, fontSize: 14 }}>Reset</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
 
   return (
     <View style={styles.container}>
@@ -545,81 +661,7 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
 
-              {expandedBucketId === b.id && (
-                <View style={styles.bucketEditor}>
-                  <TextInput
-                    style={styles.input}
-                    value={bucketDraft.name}
-                    onChangeText={v => setBucketDraft(d => ({ ...d, name: v }))}
-                    placeholder="Name"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  <TextInput
-                    style={[styles.input, { marginTop: 8 }]}
-                    value={bucketDraft.monthlyAmount}
-                    onChangeText={v => setBucketDraft(d => ({ ...d, monthlyAmount: v }))}
-                    keyboardType="numeric"
-                    placeholder={b.accumulates ? 'Monthly top-up' : 'Monthly amount'}
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  {b.accumulates && (
-                    <>
-                      <Text style={[styles.fieldHint, { marginTop: 8 }]}>
-                        Current balance: NPR {formatNPR(bs.getBucketBalance(b.id))}
-                      </Text>
-                      <TextInput
-                        style={[styles.input, { marginTop: 8 }]}
-                        value={bucketDraft.accumulationCap}
-                        onChangeText={v => setBucketDraft(d => ({ ...d, accumulationCap: v }))}
-                        keyboardType="numeric"
-                        placeholder="Max balance cap"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Text style={styles.fieldHint}>
-                        Disabling stops top-ups; balance is kept.
-                      </Text>
-                    </>
-                  )}
-                  <View style={styles.typeRow}>
-                    {BUCKET_TYPES.map(t => (
-                      <Pressable
-                        key={t}
-                        onPress={() => setBucketDraft(d => ({ ...d, type: t }))}
-                        style={[
-                          styles.typeChip,
-                          bucketDraft.type === t && { backgroundColor: colors.green },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.typeChipText,
-                            bucketDraft.type === t && { color: '#fff' },
-                          ]}
-                        >
-                          {t}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={[styles.toggleRow, { marginTop: 12 }]}>
-                    <Text style={styles.editableLabel}>Show on Home Screen</Text>
-                    <Switch
-                      value={bucketDraft.showOnHome}
-                      onValueChange={v => setBucketDraft(d => ({ ...d, showOnHome: v }))}
-                      trackColor={{ false: colors.border, true: colors.greenFill }}
-                      thumbColor={bucketDraft.showOnHome ? colors.green : '#f4f3f4'}
-                    />
-                  </View>
-                  <View style={styles.editorActions}>
-                    <TouchableOpacity onPress={() => setExpandedBucketId(null)}>
-                      <Text style={{ color: colors.textMuted, fontSize: 14 }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => saveBucketEdit(b.id)}>
-                      <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+              {expandedBucketId === b.id && renderExistingBucketEditor(b)}
             </View>
           ))}
           {livingBuckets.length === 0 && (
@@ -664,63 +706,7 @@ export default function SettingsScreen() {
                 )}
               </View>
 
-              {expandedBucketId === b.id && (
-                <View style={styles.bucketEditor}>
-                  <TextInput
-                    style={styles.input}
-                    value={bucketDraft.name}
-                    onChangeText={v => setBucketDraft(d => ({ ...d, name: v }))}
-                    placeholder="Name"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  <TextInput
-                    style={[styles.input, { marginTop: 8 }]}
-                    value={bucketDraft.monthlyAmount}
-                    onChangeText={v => setBucketDraft(d => ({ ...d, monthlyAmount: v }))}
-                    keyboardType="numeric"
-                    placeholder="Monthly amount"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                  <View style={styles.typeRow}>
-                    {BUCKET_TYPES.map(t => (
-                      <Pressable
-                        key={t}
-                        onPress={() => setBucketDraft(d => ({ ...d, type: t }))}
-                        style={[
-                          styles.typeChip,
-                          bucketDraft.type === t && { backgroundColor: colors.green },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.typeChipText,
-                            bucketDraft.type === t && { color: '#fff' },
-                          ]}
-                        >
-                          {t}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={[styles.toggleRow, { marginTop: 12 }]}>
-                    <Text style={styles.editableLabel}>Show on Home Screen</Text>
-                    <Switch
-                      value={bucketDraft.showOnHome}
-                      onValueChange={v => setBucketDraft(d => ({ ...d, showOnHome: v }))}
-                      trackColor={{ false: colors.border, true: colors.greenFill }}
-                      thumbColor={bucketDraft.showOnHome ? colors.green : '#f4f3f4'}
-                    />
-                  </View>
-                  <View style={styles.editorActions}>
-                    <TouchableOpacity onPress={() => setExpandedBucketId(null)}>
-                      <Text style={{ color: colors.textMuted, fontSize: 14 }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => saveBucketEdit(b.id)}>
-                      <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+              {expandedBucketId === b.id && renderExistingBucketEditor(b)}
             </View>
           ))}
           {futureBuckets.length === 0 && (
@@ -930,77 +916,6 @@ export default function SettingsScreen() {
             <Text style={styles.actionButtonText}>Export CSV</Text>
           </TouchableOpacity>
         </Card>
-
-        {Platform.OS === 'android' && (
-          <>
-            <SectionHeader title="Scan Bubble" description="Capture transactions over banking apps (Android)" />
-            <Card>
-              <TouchableOpacity
-                style={styles.permissionRow}
-                onPress={() => {
-                  Overlay.requestPermission()
-                  setTimeout(() => {
-                    Overlay.isPermissionGranted().then(setOverlayPerm)
-                  }, 800)
-                }}
-              >
-                <Text style={styles.permissionLabel}>Draw over other apps</Text>
-                <Ionicons
-                  name={overlayPerm ? 'checkmark-circle' : 'close-circle'}
-                  size={22}
-                  color={overlayPerm ? colors.green : colors.red}
-                />
-              </TouchableOpacity>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.permissionRow}
-                onPress={() => {
-                  Overlay.requestUsagePermission()
-                  setTimeout(() => {
-                    Overlay.checkUsagePermission().then(setUsagePerm)
-                  }, 800)
-                }}
-              >
-                <Text style={styles.permissionLabel}>App usage access</Text>
-                <Ionicons
-                  name={usagePerm ? 'checkmark-circle' : 'close-circle'}
-                  size={22}
-                  color={usagePerm ? colors.green : colors.red}
-                />
-              </TouchableOpacity>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.permissionRow}
-                onPress={async () => {
-                  try {
-                    await Overlay.requestMediaProjection()
-                    setMediaReady(true)
-                  } catch {
-                    setMediaReady(false)
-                  }
-                }}
-              >
-                <Text style={styles.permissionLabel}>Screen capture access</Text>
-                <Ionicons
-                  name={mediaReady ? 'checkmark-circle' : 'chevron-forward'}
-                  size={22}
-                  color={mediaReady ? colors.green : colors.textMuted}
-                />
-              </TouchableOpacity>
-              <View style={styles.divider} />
-              <View style={styles.permissionRow}>
-                <Text style={styles.permissionLabel}>Enable bubble</Text>
-                <Switch
-                  value={bubbleEnabled}
-                  onValueChange={handleToggleBubble}
-                  disabled={!overlayPerm || !usagePerm}
-                  trackColor={{ false: colors.border, true: colors.greenFill }}
-                  thumbColor={bubbleEnabled ? colors.green : '#f4f3f4'}
-                />
-              </View>
-            </Card>
-          </>
-        )}
 
         <SectionHeader title="Data" description="Danger zone" />
         <Card>
@@ -1242,16 +1157,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
     color: colors.green,
-  },
-  permissionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  permissionLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textPrimary,
   },
 })

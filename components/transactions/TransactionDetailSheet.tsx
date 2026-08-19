@@ -20,6 +20,7 @@ import { transactionTitle } from '@/lib/transaction-label'
 import { useBucketsStore } from '@/store/buckets'
 import { useTransactionsStore } from '@/store/transactions'
 import type { Transaction } from '@/store/transactions'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 
 interface TransactionDetailSheetProps {
   transaction: Transaction | null
@@ -38,6 +39,7 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
   const [merchant, setMerchant] = useState('')
   const [remarks, setRemarks] = useState('')
   const [saving, setSaving] = useState(false)
+  const keyboardHeight = useKeyboardHeight(visible)
 
   useEffect(() => {
     if (transaction && visible) {
@@ -125,10 +127,19 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+          enabled={Platform.OS === 'ios'}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              Platform.OS === 'ios' && keyboardHeight > 0
+                ? { paddingBottom: keyboardHeight + 24 }
+                : null,
+            ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
             {/* Amount */}
             <View style={styles.amountContainer}>
@@ -211,9 +222,19 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
                   style={styles.textInput}
                   value={remarks}
                   onChangeText={setRemarks}
-                  placeholder="OCR notes (optional)"
+                  placeholder="Notes (optional)"
                   placeholderTextColor={colors.textMuted}
                 />
+              </View>
+            ) : null}
+
+            {transaction.fundedFromBucketId ? (
+              <View style={styles.section}>
+                <Text style={styles.label}>Funded from</Text>
+                <Text style={styles.valueText}>
+                  {allBuckets.find(b => b.id === transaction.fundedFromBucketId)?.name ??
+                    'Unknown bucket'}
+                </Text>
               </View>
             ) : null}
 
@@ -227,9 +248,7 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
             <View style={styles.section}>
               <Text style={styles.label}>Source</Text>
               <View style={styles.sourceBadge}>
-                <Text style={styles.sourceBadgeText}>
-                  {transaction.source === 'ocr' ? 'OCR scan' : 'Manual entry'}
-                </Text>
+                <Text style={styles.sourceBadgeText}>Manual entry</Text>
               </View>
             </View>
 

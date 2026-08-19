@@ -65,6 +65,7 @@ export const transactions = sqliteTable('transactions', {
   date: text('date').notNull(), // ISO string
   source: text('source', { enum: ['manual', 'ocr', 'overlay'] }).notNull().default('manual'),
   remarks: text('remarks'),
+  fundedFromBucketId: text('funded_from_bucket_id'),
   parsedTxnId: text('parsed_txn_id'),
   isFlagged: integer('is_flagged', { mode: 'boolean' }).notNull().default(false),
   isRecurringDraft: integer('is_recurring_draft', { mode: 'boolean' }).notNull().default(false),

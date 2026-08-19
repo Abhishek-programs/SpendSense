@@ -20,6 +20,7 @@ export const FOOD_BUCKET_ID = 'food'
 export const PERSONAL_BUCKET_ID = 'personal'
 export const SIP_BUCKET_ID = 'sip'
 export const SHARES_BUCKET_ID = 'shares'
+export const GOAL_POOL_BUCKET_ID = 'goal-pool'
 /** @deprecated Legacy IDs — migrated in m0005; not seeded for new installs */
 export const BIGEXPENSE_EQUITY_BUCKET_ID = 'bigexpense-equity'
 export const BIGEXPENSE_DEBT_BUCKET_ID = 'bigexpense-debt'
@@ -52,6 +53,14 @@ export const DEFAULT_BUCKETS: DefaultBucket[] = [
     accumulationCap: 20000,
   },
   { id: EF_BUCKET_ID, name: 'Emergency Fund', type: 'savings', monthlyAmount: 15000, color: '#3B82F6', icon: '🛡️' },
+  {
+    id: GOAL_POOL_BUCKET_ID,
+    name: 'Saving towards goal',
+    type: 'savings',
+    monthlyAmount: 0,
+    color: GOAL_BUCKET_COLOR,
+    icon: GOAL_BUCKET_ICON,
+  },
   { id: SIP_BUCKET_ID, name: 'SIPs', type: 'investment', monthlyAmount: 6000, color: '#10B981', icon: '📈' },
   { id: SHARES_BUCKET_ID, name: 'Direct Shares', type: 'investment', monthlyAmount: 15000, color: '#6366F1', icon: '📊' },
 ]

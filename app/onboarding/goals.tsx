@@ -1,13 +1,10 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Switch,
 } from 'react-native'
 import Slider from '@react-native-community/slider'
@@ -19,18 +16,15 @@ import { colors } from '@/constants/colors'
 import { useGoalsStore } from '@/store/goals'
 import { useBucketsStore } from '@/store/buckets'
 import { formatNPR } from '@/lib/format'
-import { DEFAULT_MACBOOK_GOAL } from '@/constants/defaults'
+import { DEFAULT_MACBOOK_GOAL, GOAL_POOL_BUCKET_ID } from '@/constants/defaults'
 import { OnboardingBack } from '@/components/onboarding/OnboardingBack'
 import { OnboardingShell, useOnboardingFieldScroll } from '@/components/onboarding/OnboardingShell'
 import { clearAllGoalsForOnboarding } from '@/lib/goals/actions'
 import {
   type PaymentMode,
   computeGoalPlan,
-  backCalcMonthly,
-  monthsBetween,
   parseTargetDate,
   projectDateFromMonthly,
-  savingsPaceSliderMax,
   GOAL_BUCKET_LABELS,
 } from '@/lib/goals/plan'
 
@@ -46,11 +40,7 @@ interface GoalDraft {
   paymentChoice: PaymentChoice
   upfrontAmount: number
   emiTenureMonths: string
-  /** Committed monthly after Apply; null = use back-calc from target date */
-  committedMonthly: number | null
-  /** Slider preview before Apply */
-  sliderMonthly: number
-  paceApplied: boolean
+  shareMonthly: string
 }
 
 function newGoalDraft(overrides?: Partial<GoalDraft>): GoalDraft {
@@ -65,9 +55,7 @@ function newGoalDraft(overrides?: Partial<GoalDraft>): GoalDraft {
     paymentChoice: 'not_sure',
     upfrontAmount: Math.round(DEFAULT_MACBOOK_GOAL.targetAmount * 0.44),
     emiTenureMonths: '12',
-    committedMonthly: null,
-    sliderMonthly: 0,
-    paceApplied: false,
+    shareMonthly: '0',
     ...overrides,
   }
 }
@@ -94,55 +82,25 @@ function GoalDraftCard({
 
   const target = parseFloat(draft.targetAmount) || 0
   const saved = parseFloat(draft.alreadySaved) || 0
-  const targetDateObj = parseTargetDate(draft.targetDate, DEFAULT_MACBOOK_GOAL.monthsFromNow)
-  const monthsRemaining = monthsBetween(new Date(), targetDateObj)
-  const backCalc = backCalcMonthly(target, saved, monthsRemaining)
+  const share = parseInt(draft.shareMonthly, 10) || 0
   const paymentMode = paymentModeFromChoice(draft.paymentChoice)
   const emiTenure = parseInt(draft.emiTenureMonths, 10) || 12
-
-  const effectiveMonthly = draft.committedMonthly ?? backCalc
-  const sliderMin =
-    draft.paceApplied && draft.committedMonthly != null ? draft.committedMonthly : backCalc
-  const sliderMax = savingsPaceSliderMax(backCalc, Math.max(0, target - saved))
-  const sliderValue = draft.paceApplied
-    ? (draft.sliderMonthly || draft.committedMonthly || backCalc)
-    : draft.sliderMonthly || backCalc
-
-  const previewDate = projectDateFromMonthly(target, saved, sliderValue)
-  const currentDateLabel = format(targetDateObj, 'MMM yyyy')
-  const previewDateLabel = format(parseTargetDate(previewDate), 'MMM yyyy')
+  const projectedDate = projectDateFromMonthly(target, saved, share)
+  const projectedDateLabel = format(parseTargetDate(projectedDate), 'MMM yyyy')
 
   const plan = useMemo(
     () =>
       computeGoalPlan({
         targetAmount: target,
         alreadySaved: saved,
-        targetDate: targetDateObj,
+        targetDate: parseTargetDate(projectedDate),
         paymentMode,
         upfrontAmount: draft.upfrontAmount,
         emiTenureMonths: emiTenure,
-        totalMonthlyOverride: effectiveMonthly,
+        totalMonthlyOverride: share,
       }),
-    [target, saved, targetDateObj, paymentMode, draft.upfrontAmount, emiTenure, effectiveMonthly]
+    [target, saved, projectedDate, paymentMode, draft.upfrontAmount, emiTenure, share]
   )
-
-  const handleTargetDateChange = (v: string) => {
-    onChange({
-      targetDate: v,
-      committedMonthly: null,
-      paceApplied: false,
-      sliderMonthly: 0,
-    })
-  }
-
-  const handleApplyPace = () => {
-    onChange({
-      committedMonthly: sliderValue,
-      targetDate: previewDate,
-      paceApplied: true,
-      sliderMonthly: sliderValue,
-    })
-  }
 
   if (!draft.enabled) {
     return (
@@ -178,7 +136,7 @@ function GoalDraftCard({
         />
       </View>
 
-      <View style={styles.inputGroup} onLayout={nameField.onLayout}>
+      <View style={styles.inputGroup}>
         <Text style={styles.label}>GOAL NAME</Text>
         <TextInput
           style={styles.textInput}
@@ -190,14 +148,14 @@ function GoalDraftCard({
         />
       </View>
 
-      <View style={styles.inputGroup} onLayout={targetField.onLayout}>
+      <View style={styles.inputGroup}>
         <Text style={styles.label}>TARGET AMOUNT</Text>
         <View style={styles.inputWrapper}>
           <Text style={styles.prefix}>NPR</Text>
           <TextInput
             style={styles.input}
             value={draft.targetAmount}
-            onChangeText={v => onChange({ targetAmount: v, committedMonthly: null, paceApplied: false })}
+            onChangeText={v => onChange({ targetAmount: v })}
             keyboardType="numeric"
             onFocus={targetField.onFocus}
           />
@@ -205,24 +163,26 @@ function GoalDraftCard({
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>TARGET DATE (YYYY-MM)</Text>
-        <TextInput
-          style={styles.textInput}
-          value={draft.targetDate}
-          onChangeText={handleTargetDateChange}
-          placeholder="2027-03"
-          placeholderTextColor={colors.textMuted}
-        />
+        <Text style={styles.label}>MONTHLY FROM POOL</Text>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.prefix}>NPR</Text>
+          <TextInput
+            style={styles.input}
+            value={draft.shareMonthly}
+            onChangeText={v => onChange({ shareMonthly: v })}
+            keyboardType="numeric"
+          />
+        </View>
       </View>
 
-      <View style={styles.inputGroup} onLayout={savedField.onLayout}>
+      <View style={styles.inputGroup}>
         <Text style={styles.label}>ALREADY SAVED</Text>
         <View style={styles.inputWrapper}>
           <Text style={styles.prefix}>NPR</Text>
           <TextInput
             style={styles.input}
             value={draft.alreadySaved}
-            onChangeText={v => onChange({ alreadySaved: v, committedMonthly: null, paceApplied: false })}
+            onChangeText={v => onChange({ alreadySaved: v })}
             keyboardType="numeric"
             placeholder="0"
             placeholderTextColor={colors.textMuted}
@@ -242,7 +202,7 @@ function GoalDraftCard({
         <TouchableOpacity
           key={opt.key}
           style={[styles.paymentOption, draft.paymentChoice === opt.key && styles.paymentOptionActive]}
-          onPress={() => onChange({ paymentChoice: opt.key, committedMonthly: null, paceApplied: false })}
+          onPress={() => onChange({ paymentChoice: opt.key })}
         >
           <View style={[styles.radio, draft.paymentChoice === opt.key && styles.radioActive]} />
           <View style={{ flex: 1 }}>
@@ -261,7 +221,7 @@ function GoalDraftCard({
             maximumValue={Math.round(target * 0.9)}
             step={5000}
             value={draft.upfrontAmount}
-            onValueChange={v => onChange({ upfrontAmount: v, committedMonthly: null, paceApplied: false })}
+            onValueChange={v => onChange({ upfrontAmount: v })}
             minimumTrackTintColor={colors.green}
             maximumTrackTintColor={colors.border}
             thumbTintColor={colors.green}
@@ -274,7 +234,7 @@ function GoalDraftCard({
             <TextInput
               style={styles.textInput}
               value={draft.emiTenureMonths}
-              onChangeText={v => onChange({ emiTenureMonths: v, committedMonthly: null, paceApplied: false })}
+              onChangeText={v => onChange({ emiTenureMonths: v })}
               keyboardType="numeric"
               placeholder="12"
               placeholderTextColor={colors.textMuted}
@@ -284,10 +244,14 @@ function GoalDraftCard({
       )}
 
       <View style={styles.calcCard}>
-        <Text style={styles.calcLabel}>Monthly needed</Text>
-        <Text style={styles.calcValue}>NPR {formatNPR(plan.totalMonthly)}</Text>
+        <Text style={styles.calcLabel}>This goal's share</Text>
+        <Text style={styles.calcValue}>NPR {formatNPR(share)}/mo</Text>
         <Text style={styles.calcHint}>
-          {monthsRemaining} months until {currentDateLabel}
+          {share > 0 && target > saved
+            ? `At this pace, reach around ${projectedDateLabel}`
+            : share <= 0
+              ? 'Set a monthly share from the pool'
+              : 'Already at target'}
         </Text>
         {paymentMode === 'upfront_emi' && plan.buckets.length > 1 && (
           <View style={styles.splitPreview}>
@@ -300,44 +264,6 @@ function GoalDraftCard({
         )}
       </View>
 
-      {target > saved && backCalc > 0 && (
-        <View style={styles.paceBlock}>
-          <Text style={styles.paceTitle}>Save faster?</Text>
-          <Text style={styles.paceHint}>
-            Slide to save more each month — we'll update your target date when you tap Apply.
-          </Text>
-          <Text style={styles.paceAmount}>Save NPR {formatNPR(sliderValue)}/mo</Text>
-          <Slider
-            minimumValue={sliderMin}
-            maximumValue={sliderMax}
-            step={500}
-            value={sliderValue}
-            onValueChange={v => {
-              const clamped = Math.max(sliderMin, v)
-              onChange({
-                sliderMonthly: clamped,
-                ...(draft.paceApplied && clamped !== draft.committedMonthly
-                  ? { paceApplied: false }
-                  : {}),
-              })
-            }}
-            minimumTrackTintColor={colors.green}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.green}
-          />
-          <Text style={styles.pacePreview}>
-            Reach by {currentDateLabel}
-            {sliderValue !== backCalc ? ` → ${previewDateLabel}` : ''}
-          </Text>
-          {(!draft.paceApplied || sliderValue !== (draft.committedMonthly ?? backCalc)) &&
-            sliderValue !== backCalc && (
-            <TouchableOpacity style={styles.applyBtn} onPress={handleApplyPace}>
-              <Text style={styles.applyBtnText}>Apply new pace</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
       {canRemove && (
         <TouchableOpacity onPress={onRemove} style={styles.removeBtn}>
           <Text style={styles.removeText}>Remove this goal</Text>
@@ -349,8 +275,28 @@ function GoalDraftCard({
 
 export default function OnboardingGoalsScreen() {
   const { createGoalWithBuckets, loadGoals } = useGoalsStore()
-  const { loadBuckets } = useBucketsStore()
+  const { buckets, loadBuckets, updateBucket } = useBucketsStore()
+  const pool =
+    buckets.find(b => b.id === GOAL_POOL_BUCKET_ID)?.monthlyAmount ?? 0
+  const poolAmt = Math.max(0, Math.round(pool) || 0)
+  const seeded = useRef(false)
   const [drafts, setDrafts] = useState<GoalDraft[]>(() => [newGoalDraft()])
+
+  useEffect(() => {
+    if (seeded.current) return
+    if (poolAmt <= 0) return
+    seeded.current = true
+    setDrafts(prev =>
+      prev.length === 1 ? [{ ...prev[0], shareMonthly: String(poolAmt) }] : prev,
+    )
+  }, [poolAmt])
+
+  const counting = drafts.filter(d => d.enabled)
+  const countingValid = counting.every(d => d.name.trim() && (parseFloat(d.targetAmount) || 0) > 0)
+  const allocated = counting.reduce((s, d) => s + (parseInt(d.shareMonthly, 10) || 0), 0)
+  const remaining = poolAmt - allocated
+  const splitOk = remaining === 0 && (counting.length === 0 ? poolAmt === 0 : countingValid)
+  const canContinue = splitOk
 
   const updateDraft = useCallback((id: string, patch: Partial<GoalDraft>) => {
     setDrafts(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)))
@@ -359,7 +305,13 @@ export default function OnboardingGoalsScreen() {
   const addDraft = () => {
     setDrafts(prev => [
       ...prev,
-      newGoalDraft({ enabled: false, name: '', targetAmount: '100000', paymentChoice: 'not_sure' }),
+      newGoalDraft({
+        enabled: true,
+        name: '',
+        targetAmount: '100000',
+        shareMonthly: '0',
+        paymentChoice: 'not_sure',
+      }),
     ])
   }
 
@@ -368,6 +320,7 @@ export default function OnboardingGoalsScreen() {
   }
 
   const handleNext = async () => {
+    if (!canContinue) return
     await clearAllGoalsForOnboarding()
     await loadGoals()
 
@@ -377,17 +330,16 @@ export default function OnboardingGoalsScreen() {
       if (target <= 0 || !draft.name.trim()) continue
 
       const saved = parseFloat(draft.alreadySaved) || 0
-      const targetDateObj = parseTargetDate(draft.targetDate, DEFAULT_MACBOOK_GOAL.monthsFromNow)
-      const monthsRemaining = monthsBetween(new Date(), targetDateObj)
-      const backCalc = backCalcMonthly(target, saved, monthsRemaining)
+      const share = parseInt(draft.shareMonthly, 10) || 0
+      if (share <= 0) continue
       const paymentMode = paymentModeFromChoice(draft.paymentChoice)
-      const monthly = draft.committedMonthly ?? backCalc
+      const projected = projectDateFromMonthly(target, saved, share)
 
       await createGoalWithBuckets({
         name: draft.name.trim(),
         targetAmount: target,
-        monthlyContribution: monthly,
-        targetDate: draft.paceApplied ? draft.targetDate : (draft.targetDate.trim() || null),
+        monthlyContribution: share,
+        targetDate: share > 0 ? projected : null,
         startBalance: saved,
         paymentMode,
         upfrontAmount: paymentMode === 'upfront_emi' ? draft.upfrontAmount : undefined,
@@ -395,15 +347,25 @@ export default function OnboardingGoalsScreen() {
         isEnabled: true,
       })
     }
+
+    const poolBucket = buckets.find(b => b.id === GOAL_POOL_BUCKET_ID)
+    if (poolBucket) {
+      await updateBucket(GOAL_POOL_BUCKET_ID, { monthlyAmount: 0, isActive: false })
+    }
+
     await loadBuckets()
     await useGoalsStore.getState().loadGoals()
-    router.push('/onboarding/buckets')
+    router.push('/onboarding/balances')
   }
 
   return (
     <OnboardingShell
       footer={
-        <TouchableOpacity style={styles.button} onPress={handleNext}>
+        <TouchableOpacity
+          style={[styles.button, !canContinue && styles.buttonDisabled]}
+          onPress={handleNext}
+          disabled={!canContinue}
+        >
           <Text style={styles.buttonText}>Next</Text>
           <Ionicons name="arrow-forward" size={20} color="#fff" />
         </TouchableOpacity>
@@ -416,8 +378,24 @@ export default function OnboardingGoalsScreen() {
         </View>
         <Text style={styles.title}>Goals</Text>
         <Text style={styles.subtitle}>
-          Name your big purchases. We'll figure out how much to save each month.
+          {poolAmt > 0
+            ? `Split NPR ${formatNPR(poolAmt)}/mo across your big purchases.`
+            : 'No monthly set aside — you can skip or add goals with NPR 0/mo.'}
         </Text>
+        {poolAmt > 0 && (
+          <Text
+            style={[
+              styles.splitMeter,
+              remaining === 0 ? styles.splitOk : styles.splitOff,
+            ]}
+          >
+            {remaining === 0
+              ? 'Pool fully assigned'
+              : remaining > 0
+                ? `NPR ${formatNPR(remaining)} left to assign`
+                : `NPR ${formatNPR(Math.abs(remaining))} over the pool`}
+          </Text>
+        )}
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.draftsArea}>
@@ -470,8 +448,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: colors.textSecond,
     lineHeight: 22,
-    marginBottom: 28,
+    marginBottom: 12,
   },
+  splitMeter: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 16,
+  },
+  splitOk: { color: colors.green },
+  splitOff: { color: colors.amber },
   draftsArea: { gap: 16 },
   card: {
     backgroundColor: colors.surface,
@@ -687,6 +672,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 8,
     borderCurve: 'continuous',
+  },
+  buttonDisabled: {
+    backgroundColor: colors.textMuted,
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 18,

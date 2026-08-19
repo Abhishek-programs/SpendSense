@@ -49,8 +49,8 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
             </Text>
           </View>
           <Text style={styles.amounts}>
-            {formatNPR(spent)}{' '}
-            <Text style={styles.amountsMuted}>/ {formatNPR(bucket.monthlyAmount)}</Text>
+            <Text style={styles.spentLabel}>Spent </Text>
+            {formatNPR(spent)}
           </Text>
         </View>
         <View style={styles.barWrap}>
@@ -59,6 +59,7 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           ) : (
             <ProgressBar value={ratio} height={4} />
           )}
+          <Text style={styles.ceilingHint}>ceiling NPR {formatNPR(bucket.monthlyAmount)}</Text>
         </View>
       </Animated.View>
     )
@@ -106,7 +107,7 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
     <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Living</Text>
-        <Text style={styles.subtitle}>Spending budgets & personal fund</Text>
+        <Text style={styles.subtitle}>Ceilings & personal fund</Text>
       </View>
       <View style={styles.card}>
         {regularBuckets.map((bucket, i) => renderRegularRow(bucket, i))}
@@ -192,10 +193,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
   },
+  spentLabel: {
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+  },
   barWrap: {
     paddingBottom: 14,
   },
   fundHint: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 6,
+  },
+  ceilingHint: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
     color: colors.textMuted,

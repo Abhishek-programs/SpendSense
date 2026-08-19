@@ -11,6 +11,9 @@ export function transactionTitle(txn: Transaction): string {
 
 export function transactionSubtitle(txn: Transaction): string | null {
   const title = transactionTitle(txn)
+  if (txn.fundedFromBucketId) {
+    return null // Row renders "from {name}" separately when funded-from is set
+  }
   if (txn.merchant?.trim() && txn.merchant.trim() !== title) return txn.merchant.trim()
   return null
 }

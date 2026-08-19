@@ -12,7 +12,6 @@ Personal finance app for Android. React Native + Expo. NPR, Nepal-focused. **No 
 | 4 | `docs/screen-flows.md` | Screen behavior and UX specs (historical where stale) |
 | 5 | `BUILD_ORDER.md` | What's done vs next |
 | 6 | `docs/prd.md` | Product intent (historical where stale) |
-| 7 | `docs/overlay-v2.md` | V2 bubble overlay — only when building overlay |
 
 If docs conflict: **AGENTS.md → core-function / design-and-features → screen-flows → BUILD_ORDER → prd**.
 
@@ -26,9 +25,9 @@ cp .env.example .env   # optional — app runs without it today
 npx expo start
 ```
 
-Copy `.env.example` → `.env`. See `.env.example` for EAS/OCR vars when needed.
+Copy `.env.example` → `.env`. See `.env.example` for EAS vars when needed.
 
-**Native modules (OCR, overlay):** need a dev client, not Expo Go. See `.claude/skills/expo-dev-client` after running `npx skills experimental_install`.
+**Recommended:** a development build (`npx expo run:android`) so local notifications work fully. Expo Go works for basic UI but warns on `expo-notifications`.
 
 ---
 
@@ -43,8 +42,6 @@ Copy `.env.example` → `.env`. See `.env.example` for EAS/OCR vars when needed.
 | State | Zustand (`store/`) |
 | Database | expo-sqlite + Drizzle (`db/`) |
 | Charts | react-native-gifted-charts |
-| OCR | `rn-mlkit-ocr` on-device — `lib/ocr.ts` + per-app templates in `lib/ocr-templates/`; dev client required |
-| Overlay (V2) | Kotlin in `native/android/screenshotbubble/` + `plugins/withSpendSenseOverlay.js` (applied on prebuild) |
 | Fonts | Inter via `@expo-google-fonts/inter` |
 
 No tests in V1. No drive-by refactors.
@@ -71,13 +68,11 @@ components/
 
 store/                  Zustand — playbook, buckets, transactions, goals, lending
 db/                     schema.ts, client.ts, migrations/, seed.ts
-lib/                    format, categorize, projection, ocr, ocr-templates/, overlay, overlay-headless, goals/, …
-native/android/screenshotbubble/  Kotlin bubble overlay + Headless JS OCR bridge
-plugins/                withSpendSenseOverlay.js — manifest, gradle, MainApplication, copy bubble sources
-constants/              colors.ts, defaults.ts (no seeded BigExpense buckets — goals create buckets dynamically)
+lib/                    format, categorize, projection, goals/, …
+constants/              colors.ts, defaults.ts
 components/onboarding/  OnboardingBack (subtle chevron)
-hooks/                  usePulseData.ts, useOverlay.ts
-docs/                   screen-flows, prd, overlay-v2 prompt, mockup
+hooks/                  usePulseData.ts
+docs/                   screen-flows, prd, mockup (historical where stale)
 .claude/skills/         Agent skills (see below)
 ```
 
@@ -91,7 +86,7 @@ Entry point: `expo-router/entry` (`package.json` `"main"`).
 Home  |  Transactions  |  [+]  |  Goals  |  Settings
 ```
 
-- `[+]` opens `ManualEntrySheet` — **not a tab**, no route change.
+- `[+]` opens `ManualEntrySheet` — **not a tab**, no route change. Manual entry only (expense / income / lend-borrow).
 - Transaction/goal details: bottom sheets inside their tab.
 - Design tokens: `constants/colors.ts`. Light theme only. Inter. NPR amounts use tabular nums.
 
@@ -113,19 +108,21 @@ Never auto-memorize ambiguous merchants.
 
 **EF target:** `EF_MULTIPLIER` × Core Living monthly amount (`constants/defaults.ts`, onboarding Foundations).
 
+**Onboarding order:** Foundations → Bucket Builder (includes **Saving towards goal** pool) → Goals (split that pool) → Balances.
+
 **Spending buckets:** green &lt;80%, amber 80–99%, red ≥100%.
 
 **Nudges:** max 1/day, quiet 10pm–8am (`lib/notifications.ts`).
 
-**Overlay work:** keep changes scoped to `native/android/screenshotbubble/`, `plugins/withSpendSenseOverlay.js`, `lib/overlay.ts`, `lib/overlay-headless.ts`, `index.js`. See `docs/overlay-v2.md`.
+**Funded-from savings:** When logging a contribution to a savings/investment bucket, optional `fundedFromBucketId` uses that Living/Personal ceiling or fund; destination still gets `__savings_confirm__`. See `docs/superpowers/specs/2026-07-26-living-ceilings-funded-from-design.md`.
 
 ---
 
 ## V1 scope (short)
 
-**In:** manual entry, screenshot OCR flow, auto-categorize, home dashboard (Your money + Hero ring + Living/Future), lent & borrowed, transactions + charts, goals/Vault, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export.
+**In:** manual entry, auto-categorize, home dashboard (Your money + Hero ring + Living/Future), lent & borrowed, transactions + charts, goals/Vault, settings/playbook, 6-step onboarding, month checklist, nudges, CSV export.
 
-**Out:** share intent, SMS/email, dark mode, AI chat, iOS, cloud sync. Bubble overlay requires dev client build.
+**Out:** OCR / receipt scan, share intent, bubble overlay, SMS/email, dark mode, AI chat, iOS, cloud sync.
 
 ---
 
@@ -150,7 +147,6 @@ Cursor and Claude both discover skills under `.claude/skills/` and `.agents/skil
 | NativeWind / Tailwind | `expo-tailwind-setup` |
 | Dev client builds | `expo-dev-client` |
 | EAS / Play Store | `expo-deployment` |
-| Native modules (overlay) | `expo-module` |
 | SDK upgrades | `upgrading-expo` |
 
 ### Coding style

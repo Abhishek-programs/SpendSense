@@ -1,31 +1,29 @@
 import type { ReactNode, RefObject } from 'react'
-import { useEffect, useRef, useState, useCallback, createContext, useContext } from 'react'
+import { useCallback, createContext, useContext } from 'react'
 import {
   View,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   ViewStyle,
-  Keyboard,
-  type LayoutChangeEvent,
-  type NativeSyntheticEvent,
-  type TextInputFocusEventData,
+  KeyboardAvoidingView,
+  type TextInputProps,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '@/constants/colors'
+import { useScrollFocusedToTop } from '@/hooks/useKeyboardHeight'
 
 interface OnboardingShellProps {
   children: ReactNode
   footer: ReactNode
+  header?: ReactNode
   scrollRef?: RefObject<ScrollView | null>
   contentContainerStyle?: ViewStyle
 }
 
 interface FieldScrollContextValue {
   bindField: (key: string) => {
-    onLayout: (e: LayoutChangeEvent) => void
-    onFocus: (e: NativeSyntheticEvent<TextInputFocusEventData>) => void
+    onFocus: NonNullable<TextInputProps['onFocus']>
   }
 }
 
@@ -39,88 +37,53 @@ export function useOnboardingFieldScroll() {
   return ctx
 }
 
+const FOOTER_TOP_PAD = 12
+
 export function OnboardingShell({
   children,
   footer,
-  scrollRef: externalScrollRef,
+  header,
   contentContainerStyle,
 }: OnboardingShellProps) {
   const insets = useSafeAreaInsets()
-  const internalScrollRef = useRef<ScrollView>(null)
-  const scrollRef = externalScrollRef ?? internalScrollRef
-  const fieldOffsets = useRef<Record<string, number>>({})
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-
-    const show = Keyboard.addListener(showEvent, e => {
-      setKeyboardHeight(e.endCoordinates.height)
-    })
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0)
-    })
-
-    return () => {
-      show.remove()
-      hide.remove()
-    }
-  }, [])
-
-  const scrollToField = useCallback(
-    (key: string) => {
-      const y = fieldOffsets.current[key]
-      if (y == null) return
-      setTimeout(
-        () => {
-          scrollRef.current?.scrollTo({ y: Math.max(0, y - 96), animated: true })
-        },
-        Platform.OS === 'android' ? 120 : 60,
-      )
-    },
-    [scrollRef],
-  )
+  const { keyboardHeight, scrollRef, scrollHostRef, onInputFocus, onScroll } =
+    useScrollFocusedToTop()
 
   const bindField = useCallback(
-    (key: string) => ({
-      onLayout: (e: LayoutChangeEvent) => {
-        fieldOffsets.current[key] = e.nativeEvent.layout.y
-      },
-      onFocus: (_e: NativeSyntheticEvent<TextInputFocusEventData>) => {
-        scrollToField(key)
-      },
+    (_key: string) => ({
+      onFocus: onInputFocus,
     }),
-    [scrollToField],
+    [onInputFocus],
   )
-
-  const keyboardInset = Platform.OS === 'ios' ? 0 : keyboardHeight
 
   return (
     <FieldScrollContext.Provider value={{ bindField }}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.scrollContent,
-            contentContainerStyle,
-            {
-              paddingTop: Math.max(insets.top, 16),
-              paddingBottom: 24 + keyboardInset,
-            },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets
-        >
-          {children}
-        </ScrollView>
+        {header}
+        <View ref={scrollHostRef} style={styles.scroll} collapsable={false}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              contentContainerStyle,
+              {
+                paddingTop: header ? 16 : Math.max(insets.top, 16),
+                paddingBottom: 24 + keyboardHeight,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+          >
+            {children}
+          </ScrollView>
+        </View>
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           {footer}
         </View>
@@ -142,7 +105,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: FOOTER_TOP_PAD,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.pageBg,

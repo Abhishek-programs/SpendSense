@@ -10,10 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR } from '@/lib/format'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 
 interface ShareConfirmSheetProps {
   visible: boolean
@@ -30,6 +31,8 @@ export function ShareConfirmSheet({
   onConfirm,
   onClose,
 }: ShareConfirmSheetProps) {
+  const insets = useSafeAreaInsets()
+  const keyboardHeight = useKeyboardHeight(visible)
   const [amount, setAmount] = useState(String(defaultAmount))
 
   useEffect(() => {
@@ -45,14 +48,20 @@ export function ShareConfirmSheet({
     onClose()
   }
 
+  const sheetLift = keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboard}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.bottom : 0}
         >
-          <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
+          <Pressable
+            style={[styles.sheet, { marginBottom: sheetLift }]}
+            onPress={e => e.stopPropagation()}
+          >
             <SafeAreaView edges={['bottom']}>
               <View style={styles.handle} />
               <Text style={styles.title}>Confirm {bucketName}</Text>

@@ -152,6 +152,9 @@ export function applySchemaPatches() {
          AND \`remarks\` NOT LIKE '__%'`,
     )
   }
+  if (transactionsExists && !hasColumn('transactions', 'funded_from_bucket_id')) {
+    sqlite.execSync(`ALTER TABLE \`transactions\` ADD COLUMN \`funded_from_bucket_id\` text`)
+  }
 
   const contactsTable = sqlite.getFirstSync(
     `SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'`,
@@ -187,40 +190,57 @@ export function applySchemaPatches() {
   }
 }
 
-export async function runMigrations() {
-  // Check if app tables exist but the migration was never recorded.
-  // This happens when tables were created outside Drizzle's migrator.
-  const appTableExists = sqlite.getFirstSync(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name='buckets'`
-  )
-  let migrationRecorded = false
+let migrationsPromise: Promise<void> | null = null
+
+function countRecordedMigrations(): number {
   try {
-    const row = sqlite.getFirstSync(`SELECT hash FROM __drizzle_migrations LIMIT 1`)
-    migrationRecorded = !!row
+    const rows = sqlite.getAllSync(`SELECT hash FROM __drizzle_migrations`) as { hash: string }[]
+    return rows.length
   } catch {
-    // __drizzle_migrations table doesn't exist yet — that's fine
+    return 0
   }
+}
 
-  if (appTableExists && !migrationRecorded) {
-    // Dirty state: tables exist but migrator doesn't know. Nuke and redo.
-    for (const table of [...APP_TABLES, '__drizzle_migrations']) {
-      sqlite.execSync(`DROP TABLE IF EXISTS "${table}"`)
+export async function runMigrations() {
+  // Fast Refresh / Strict Mode can remount root layout; share one in-flight run.
+  if (migrationsPromise) return migrationsPromise
+
+  migrationsPromise = (async () => {
+    const appTableExists = sqlite.getFirstSync(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='buckets'`,
+    )
+    const beforeCount = countRecordedMigrations()
+
+    if (appTableExists && beforeCount === 0) {
+      // Dirty state: tables exist but migrator doesn't know. Nuke and redo.
+      console.warn('DB dirty state (tables without migration journal) — resetting schema')
+      for (const table of [...APP_TABLES, '__drizzle_migrations']) {
+        sqlite.execSync(`DROP TABLE IF EXISTS "${table}"`)
+      }
     }
-  }
+
+    try {
+      await migrate(db, migrations)
+      applySchemaPatches()
+      const afterCount = countRecordedMigrations()
+      if (afterCount > beforeCount) {
+        console.log(`DB migrations applied (${beforeCount} → ${afterCount})`)
+      }
+    } catch (error) {
+      console.error('Migration failed, attempting hard reset:', error)
+      for (const table of [...APP_TABLES, '__drizzle_migrations']) {
+        sqlite.execSync(`DROP TABLE IF EXISTS "${table}"`)
+      }
+      await migrate(db, migrations)
+      applySchemaPatches()
+      console.log('DB recovered after hard reset')
+    }
+  })()
 
   try {
-    await migrate(db, migrations)
-    applySchemaPatches()
-    console.log('✅ DB migrations applied successfully')
+    await migrationsPromise
   } catch (error) {
-    console.error('❌ Migration failed, attempting Hard Reset:', error)
-    // If migration fails, it's likely a schema conflict. Nuke everything and retry.
-    for (const table of [...APP_TABLES, '__drizzle_migrations']) {
-      sqlite.execSync(`DROP TABLE IF EXISTS "${table}"`)
-    }
-    // Re-run migration from scratch
-    await migrate(db, migrations)
-    applySchemaPatches()
-    console.log('✅ DB recovered after Hard Reset')
+    migrationsPromise = null
+    throw error
   }
 }

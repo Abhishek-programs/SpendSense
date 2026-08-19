@@ -6,26 +6,27 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Keyboard,
+  KeyboardAvoidingView,
   Alert,
   BackHandler,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import DateTimePicker from '@react-native-community/datetimepicker'
-import * as ImagePicker from 'expo-image-picker'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatDate } from '@/lib/format'
 import { categorize } from '@/lib/categorize'
-import { processReceiptImage } from '@/lib/ocr'
-import { useBucketsStore, type Bucket } from '@/store/buckets'
+import { useBucketsStore } from '@/store/buckets'
 import { usePlaybookStore } from '@/store/playbook'
 import { useTransactionsStore, INCOME_BUCKET_ID } from '@/store/transactions'
 import { useLendingStore } from '@/store/lending'
 import { LendBorrowForm } from '@/components/lending/LendBorrowForm'
+
+const SAVE_BUTTON_HEIGHT = 56
+const FOOTER_PAD_TOP = 16
 
 type EntryType = 'expense' | 'income' | 'lend_borrow'
 
@@ -36,8 +37,10 @@ interface ManualEntrySheetProps {
 
 export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const amountRef = useRef<TextInput>(null)
+  const insets = useSafeAreaInsets()
 
-  const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants, buckets } = useBucketsStore()
+  const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants, buckets } =
+    useBucketsStore()
   const { fallbackBucketId } = usePlaybookStore()
   const { addTransaction } = useTransactionsStore()
   const { addEntry: addLendEntry } = useLendingStore()
@@ -46,12 +49,12 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const savingsBuckets = getSavingsBuckets()
   const allBuckets = [...spendingBuckets, ...savingsBuckets]
 
-  const [mode, setMode] = useState<'manual' | 'scan'>('scan')
   const [amount, setAmount] = useState('')
   const [entryType, setEntryType] = useState<EntryType>('expense')
   const isIncome = entryType === 'income'
   const isLendBorrow = entryType === 'lend_borrow'
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null)
+  const [fundedFromBucketId, setFundedFromBucketId] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [merchant, setMerchant] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -59,25 +62,13 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [scanning, setScanning] = useState(false)
-  const [fromOcr, setFromOcr] = useState(false)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
-  useEffect(() => {
-    if (!visible) return
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-    const showSub = Keyboard.addListener(showEvent, e => {
-      setKeyboardHeight(e.endCoordinates.height)
-    })
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0)
-    })
-    return () => {
-      showSub.remove()
-      hideSub.remove()
-    }
-  }, [visible])
+  const selectedBucket = allBuckets.find(b => b.id === selectedBucketId)
+  const isSavingsDestination =
+    !!selectedBucket && (selectedBucket.type === 'savings' || selectedBucket.type === 'investment')
+  const fundedFromOptions = spendingBuckets.filter(b => b.id !== selectedBucketId)
+
+  const footerBottomPad = Math.max(insets.bottom, 16)
 
   useEffect(() => {
     if (!visible) return
@@ -88,23 +79,20 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
     return () => sub.remove()
   }, [visible, onClose])
 
-  // Reset form when sheet opens
   useEffect(() => {
-    if (visible) {
-      setMode('scan')
-      setAmount('')
-      setEntryType('expense')
-      setSelectedBucketId(null)
-      setDescription('')
-      setMerchant('')
-      setRemarks('')
-      setDate(new Date())
-      setShowDatePicker(false)
-      setIsRecurring(false)
-      setSaving(false)
-      setFromOcr(false)
-      setKeyboardHeight(0)
-    }
+    if (!visible) return
+    setAmount('')
+    setEntryType('expense')
+    setSelectedBucketId(null)
+    setFundedFromBucketId(null)
+    setDescription('')
+    setMerchant('')
+    setRemarks('')
+    setDate(new Date())
+    setShowDatePicker(false)
+    setIsRecurring(false)
+    setSaving(false)
+    setTimeout(() => amountRef.current?.focus(), 100)
   }, [visible])
 
   const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0
@@ -126,40 +114,60 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
           date: date.toISOString(),
           source: 'manual',
           remarks: remarks.trim() || null,
+          fundedFromBucketId: null,
           parsedTxnId: null,
           isFlagged: false,
           isRecurringDraft: isRecurring,
         })
       } else {
-        const catInput = {
-          description: description.trim() || null,
-          remarks: fromOcr ? remarks.trim() || merchant.trim() || null : null,
-          merchant: merchant.trim() || null,
-          keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
-          sureShotMerchants: sureShotMerchants.map(m => ({ merchantName: m.merchantName, bucketId: m.bucketId })),
-          fallbackBucketId: fallbackBucketId ?? allBuckets[0]?.id ?? '',
-        }
-        const result = categorize(catInput)
+        const destBucket = allBuckets.find(b => b.id === selectedBucketId)
+        const isSavingsDest =
+          !!destBucket && (destBucket.type === 'savings' || destBucket.type === 'investment')
 
-        const finalBucketId = selectedBucketId ?? result.bucketId
-        const finalFlagged = selectedBucketId ? false : result.isFlagged
+        let finalBucketId = selectedBucketId
+        let finalFlagged = false
+        let txnRemarks: string | null = remarks.trim() || null
+        let fundedFrom: string | null = null
+
+        if (isSavingsDest && selectedBucketId) {
+          finalBucketId = selectedBucketId
+          txnRemarks = '__savings_confirm__'
+          fundedFrom = fundedFromBucketId
+        } else {
+          const result = categorize({
+            description: description.trim() || null,
+            remarks: remarks.trim() || null,
+            merchant: merchant.trim() || null,
+            keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
+            sureShotMerchants: sureShotMerchants.map(m => ({
+              merchantName: m.merchantName,
+              bucketId: m.bucketId,
+            })),
+            fallbackBucketId: fallbackBucketId ?? allBuckets[0]?.id ?? '',
+          })
+          finalBucketId = selectedBucketId ?? result.bucketId
+          finalFlagged = selectedBucketId ? false : result.isFlagged
+        }
 
         const { overspent } = await addTransaction({
           type: 'expense',
           amount: parsedAmount,
           description: description.trim() || null,
-          merchant: merchant.trim() || null,
-          bucketId: finalBucketId,
+          merchant: merchant.trim() || (isSavingsDest ? destBucket?.name ?? null : null),
+          bucketId: finalBucketId!,
           date: date.toISOString(),
-          source: fromOcr ? 'ocr' : 'manual',
-          remarks: fromOcr ? remarks.trim() || merchant.trim() || null : null,
+          source: 'manual',
+          remarks: txnRemarks,
+          fundedFromBucketId: fundedFrom,
           parsedTxnId: null,
           isFlagged: finalFlagged,
           isRecurringDraft: isRecurring,
         })
 
-        const bucket = buckets.find(b => b.id === finalBucketId)
-        if (overspent && bucket?.accumulates) {
+        const overspendBucket = fundedFrom
+          ? buckets.find(b => b.id === fundedFrom)
+          : buckets.find(b => b.id === finalBucketId)
+        if (overspent && overspendBucket?.accumulates) {
           Alert.alert(
             'Personal fund empty',
             `Personal fund empty — NPR ${formatNPR(overspent)} overspent.`,
@@ -182,7 +190,6 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={24} color={colors.textPrimary} />
@@ -192,82 +199,65 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+          style={styles.body}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingBottom: Math.max(40, keyboardHeight > 0 ? keyboardHeight - 80 : 0) },
-            ]}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
           >
-            {/* Mode Toggle */}
-            {!isLendBorrow && (
-            <View style={styles.modeToggle}>
-              <TouchableOpacity
-                style={[styles.modeButton, mode === 'scan' && styles.modeButtonActive]}
-                onPress={() => {
-                  setMode('scan')
-                  Keyboard.dismiss()
-                }}
-              >
-                <Ionicons
-                  name="scan"
-                  size={18}
-                  color={mode === 'scan' ? colors.green : colors.textMuted}
-                />
-                <Text style={[styles.modeButtonText, mode === 'scan' && styles.modeButtonTextActive]}>
-                  Scan Receipt
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeButton, mode === 'manual' && styles.modeButtonActive]}
-                onPress={() => {
-                  setMode('manual')
-                  setTimeout(() => amountRef.current?.focus(), 100)
-                }}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={18}
-                  color={mode === 'manual' ? colors.green : colors.textMuted}
-                />
-                <Text style={[styles.modeButtonText, mode === 'manual' && styles.modeButtonTextActive]}>
-                  Manual Entry
-                </Text>
-              </TouchableOpacity>
-            </View>
-            )}
-
-            {/* Type toggle */}
             <View style={styles.typeToggle}>
               <TouchableOpacity
                 style={[styles.typeButton, entryType === 'expense' && styles.typeButtonActive]}
-                onPress={() => setEntryType('expense')}
+                onPress={() => {
+                  setEntryType('expense')
+                  Keyboard.dismiss()
+                }}
               >
-                <Text style={[styles.typeButtonText, entryType === 'expense' && styles.typeButtonTextActive]}>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    entryType === 'expense' && styles.typeButtonTextActive,
+                  ]}
+                >
                   Expense
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeButton, entryType === 'income' && styles.typeButtonActiveIncome]}
-                onPress={() => setEntryType('income')}
+                onPress={() => {
+                  setEntryType('income')
+                  Keyboard.dismiss()
+                }}
               >
-                <Text style={[styles.typeButtonText, entryType === 'income' && styles.typeButtonTextActiveIncome]}>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    entryType === 'income' && styles.typeButtonTextActiveIncome,
+                  ]}
+                >
                   Income
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.typeButton, entryType === 'lend_borrow' && styles.typeButtonActiveLend]}
+                style={[
+                  styles.typeButton,
+                  entryType === 'lend_borrow' && styles.typeButtonActiveLend,
+                ]}
                 onPress={() => {
                   setEntryType('lend_borrow')
                   Keyboard.dismiss()
                 }}
               >
-                <Text style={[styles.typeButtonText, entryType === 'lend_borrow' && styles.typeButtonTextActiveLend]}>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    entryType === 'lend_borrow' && styles.typeButtonTextActiveLend,
+                  ]}
+                >
                   Lend/Borrow
                 </Text>
               </TouchableOpacity>
@@ -289,214 +279,200 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
               />
             ) : (
               <>
-            {mode === 'scan' && (
-              <View style={styles.scanContainer}>
-                <TouchableOpacity 
-                  style={styles.scanPicker}
-                  onPress={async () => {
-                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-                    if (status !== 'granted') {
-                      alert('Sorry, we need camera roll permissions to make this work!')
-                      return
-                    }
-
-                    const result = await ImagePicker.launchImageLibraryAsync({
-                      mediaTypes: ['images'],
-                      allowsEditing: true,
-                      quality: 0.8,
-                    })
-
-                    if (!result.canceled && result.assets[0]) {
-                      setScanning(true)
-                      try {
-                        const ocr = await processReceiptImage(result.assets[0].uri)
-                        if (!ocr?.amount) {
-                          alert("Doesn't look like a receipt — fill manually.")
-                          setMode('manual')
-                          return
-                        }
-
-                        setAmount(String(ocr.amount))
-                        if (ocr.merchant) setMerchant(ocr.merchant)
-                        if (ocr.remarks) setRemarks(ocr.remarks)
-                        if (ocr.date) setDate(new Date(ocr.date))
-
-                        const catResult = categorize({
-                          description: null,
-                          remarks: ocr.remarks,
-                          merchant: ocr.merchant,
-                          keywords: keywordMappings.map(k => ({ keyword: k.keyword, bucketId: k.bucketId })),
-                          sureShotMerchants: sureShotMerchants.map(m => ({ merchantName: m.merchantName, bucketId: m.bucketId })),
-                          fallbackBucketId: fallbackBucketId ?? allBuckets[0]?.id ?? '',
-                        })
-                        if (catResult.bucketId) setSelectedBucketId(catResult.bucketId)
-
-                        setFromOcr(true)
-                        setMode('manual')
-                        setTimeout(() => amountRef.current?.focus(), 200)
-                      } catch {
-                        alert('Could not scan receipt. Use a dev client with ML Kit, or fill manually.')
-                        setMode('manual')
-                      } finally {
-                        setScanning(false)
-                      }
-                    }
-                  }}
-                  disabled={scanning}
-                >
-                  <View style={styles.scanIconBg}>
-                    {scanning ? (
-                      <Ionicons name="refresh" size={32} color={colors.green} />
-                    ) : (
-                      <Ionicons name="image-outline" size={32} color={colors.green} />
-                    )}
-                  </View>
-                  <Text style={styles.scanTitle}>
-                    {scanning ? 'Analyzing...' : 'Pick a receipt screenshot'}
-                  </Text>
-                  <Text style={styles.scanSub}>
-                    {scanning ? 'Extracting merchant & amount' : 'eSewa, Khalti, or Bank receipts'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <View style={styles.scanDivider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR FILL BELOW</Text>
-                  <View style={styles.dividerLine} />
+                <View style={styles.amountContainer}>
+                  <Text style={[styles.currencyLabel, isIncome && { color: colors.green }]}>NPR</Text>
+                  <TextInput
+                    ref={amountRef}
+                    style={[styles.amountInput, isIncome && { color: colors.green }]}
+                    value={amount}
+                    onChangeText={setAmount}
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                  />
                 </View>
-              </View>
-            )}
 
-            {/* Amount */}
-            <View style={styles.amountContainer}>
-              <Text style={[styles.currencyLabel, isIncome && { color: colors.green }]}>NPR</Text>
-              <TextInput
-                ref={amountRef}
-                style={[styles.amountInput, isIncome && { color: colors.green }]}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-                returnKeyType="done"
-              />
-            </View>
+                {!isIncome && (
+                  <View style={styles.section}>
+                    <Text style={styles.label}>Bucket</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chipRow}
+                    >
+                      {allBuckets.map(bucket => {
+                        const selected = selectedBucketId === bucket.id
+                        return (
+                          <TouchableOpacity
+                            key={bucket.id}
+                            style={[
+                              styles.bucketChip,
+                              selected && {
+                                backgroundColor: bucket.color + '22',
+                                borderColor: bucket.color,
+                              },
+                            ]}
+                            onPress={() => {
+                              Keyboard.dismiss()
+                              const next = selected ? null : bucket.id
+                              setSelectedBucketId(next)
+                              const nextBucket = allBuckets.find(b => b.id === next)
+                              const stillSavings =
+                                !!nextBucket &&
+                                (nextBucket.type === 'savings' || nextBucket.type === 'investment')
+                              if (!stillSavings) setFundedFromBucketId(null)
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, marginRight: 4 }}>{bucket.icon}</Text>
+                            <Text
+                              style={[
+                                styles.bucketChipText,
+                                selected && { color: bucket.color },
+                              ]}
+                            >
+                              {bucket.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
 
-            {/* Bucket selector — hidden for income */}
-            {!isIncome && (
-              <View style={styles.section}>
-                <Text style={styles.label}>Bucket</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
+                {isSavingsDestination && (
+                  <View style={styles.section}>
+                    <Text style={styles.label}>Funded from (optional)</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chipRow}
+                    >
+                      {fundedFromOptions.map(bucket => {
+                        const selected = fundedFromBucketId === bucket.id
+                        return (
+                          <TouchableOpacity
+                            key={bucket.id}
+                            style={[
+                              styles.bucketChip,
+                              selected && {
+                                backgroundColor: bucket.color + '22',
+                                borderColor: bucket.color,
+                              },
+                            ]}
+                            onPress={() =>
+                              setFundedFromBucketId(selected ? null : bucket.id)
+                            }
+                          >
+                            <Text style={{ fontSize: 14, marginRight: 4 }}>{bucket.icon}</Text>
+                            <Text
+                              style={[
+                                styles.bucketChipText,
+                                selected && { color: bucket.color },
+                              ]}
+                            >
+                              {bucket.name}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </ScrollView>
+                    <Text style={styles.fundedHint}>
+                      Uses that ceiling or Personal balance; destination still gets the
+                      contribution.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.section}>
+                  <Text style={styles.label}>Description</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="e.g. Outing with friends, momo"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.label}>Merchant (optional)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={merchant}
+                    onChangeText={setMerchant}
+                    placeholder="e.g. Bhat-Bhateni, NTC"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
+
+                {!isSavingsDestination && (
+                  <View style={styles.section}>
+                    <Text style={styles.label}>Notes (optional)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={remarks}
+                      onChangeText={setRemarks}
+                      placeholder="Anything else to remember"
+                      placeholderTextColor={colors.textMuted}
+                    />
+                  </View>
+                )}
+
+                <View style={styles.section}>
+                  <Text style={styles.label}>Date</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color={colors.textSecond} />
+                    <Text style={styles.dateText}>{formatDate(date)}</Text>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={date}
+                      mode="date"
+                      display="spinner"
+                      maximumDate={new Date()}
+                      onChange={(_, selectedDate) => {
+                        setShowDatePicker(Platform.OS === 'ios')
+                        if (selectedDate) setDate(selectedDate)
+                      }}
+                    />
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={() => setIsRecurring(!isRecurring)}
+                  activeOpacity={0.7}
                 >
-                  {allBuckets.map(bucket => {
-                    const selected = selectedBucketId === bucket.id
-                    return (
-                      <TouchableOpacity
-                        key={bucket.id}
-                        style={[
-                          styles.bucketChip,
-                          selected && { backgroundColor: bucket.color + '22', borderColor: bucket.color },
-                        ]}
-                        onPress={() => setSelectedBucketId(selected ? null : bucket.id)}
-                      >
-                        <Text style={{ fontSize: 14, marginRight: 4 }}>{bucket.icon}</Text>
-                        <Text
-                          style={[
-                            styles.bucketChipText,
-                            selected && { color: bucket.color },
-                          ]}
-                        >
-                          {bucket.name}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Description — what you did / bought */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={styles.textInput}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="e.g. Outing with friends, momo, date with baby"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            {/* Merchant — optional, usually from OCR */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Merchant (optional)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={merchant}
-                onChangeText={setMerchant}
-                placeholder="e.g. Bhat-Bhateni, NTC — from receipt if scanned"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            {/* Date */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Date</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar-outline" size={18} color={colors.textSecond} />
-                <Text style={styles.dateText}>{formatDate(date)}</Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="spinner"
-                  maximumDate={new Date()}
-                  onChange={(_, selectedDate) => {
-                    setShowDatePicker(Platform.OS === 'ios')
-                    if (selectedDate) setDate(selectedDate)
-                  }}
-                />
-              )}
-            </View>
-
-            {/* Recurring toggle */}
-            <TouchableOpacity
-              style={styles.toggleRow}
-              onPress={() => setIsRecurring(!isRecurring)}
-              activeOpacity={0.7}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleLabel}>Recurring monthly</Text>
-                <Text style={styles.toggleHint}>Auto-create draft each month</Text>
-              </View>
-              <View style={[styles.toggle, isRecurring && styles.toggleActive]}>
-                <View style={[styles.toggleKnob, isRecurring && styles.toggleKnobActive]} />
-              </View>
-            </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleLabel}>Recurring monthly</Text>
+                    <Text style={styles.toggleHint}>Auto-create draft each month</Text>
+                  </View>
+                  <View style={[styles.toggle, isRecurring && styles.toggleActive]}>
+                    <View style={[styles.toggleKnob, isRecurring && styles.toggleKnobActive]} />
+                  </View>
+                </TouchableOpacity>
               </>
             )}
           </ScrollView>
 
           {!isLendBorrow && (
-          <View style={[styles.footer, keyboardHeight > 0 && { paddingBottom: 12 }]}>
-            <TouchableOpacity
-              style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={!canSave || saving}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.saveButtonText}>
-                {saving ? 'Saving...' : isIncome ? 'Add income' : 'Add expense'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <View style={[styles.footer, { paddingBottom: footerBottomPad }]}>
+              <TouchableOpacity
+                style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={!canSave || saving}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? 'Saving...' : isIncome ? 'Add income' : 'Add expense'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -523,153 +499,76 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
   },
+  body: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
-  },
-  modeToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#00000008',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 24,
-  },
-  modeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 8,
-  },
-  modeButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  modeButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.textMuted,
-  },
-  modeButtonTextActive: {
-    color: colors.textPrimary,
-  },
-  scanContainer: {
-    marginBottom: 24,
-  },
-  scanPicker: {
-    backgroundColor: '#16A34A08',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#16A34A33',
-    borderRadius: 20,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderCurve: 'continuous',
-  },
-  scanIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-  },
-  scanTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  scanSub: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textSecond,
-  },
-  scanDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.divider,
-  },
-  dividerText: {
-    fontSize: 10,
-    fontFamily: 'Inter_700Bold',
-    color: colors.textMuted,
-    letterSpacing: 1,
-  },
-  amountContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  currencyLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textMuted,
-    marginBottom: 4,
-  },
-  amountInput: {
-    fontSize: 48,
-    fontFamily: 'Inter_700Bold',
-    color: colors.textPrimary,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-    minWidth: 120,
-    padding: 0,
   },
   typeToggle: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: 12,
+    padding: 3,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 4,
-    marginBottom: 24,
   },
   typeButton: {
     flex: 1,
     paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
-    borderRadius: 8,
   },
   typeButtonActive: {
-    backgroundColor: colors.red + '15',
+    backgroundColor: '#FEE2E2',
   },
   typeButtonActiveIncome: {
     backgroundColor: colors.greenFill,
   },
   typeButtonActiveLend: {
-    backgroundColor: colors.purple + '18',
+    backgroundColor: colors.amberFill,
   },
   typeButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
     color: colors.textMuted,
   },
   typeButtonTextActive: {
     color: colors.red,
+    fontFamily: 'Inter_600SemiBold',
   },
   typeButtonTextActiveIncome: {
     color: colors.green,
+    fontFamily: 'Inter_600SemiBold',
   },
   typeButtonTextActiveLend: {
-    color: colors.purple,
+    color: colors.amber,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 28,
+    gap: 8,
+  },
+  currencyLabel: {
+    fontSize: 20,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textSecond,
+  },
+  amountInput: {
+    fontSize: 48,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+    minWidth: 80,
+    textAlign: 'center',
+    padding: 0,
   },
   section: {
     marginBottom: 20,
@@ -677,28 +576,34 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: colors.textSecond,
+    color: colors.textMuted,
     marginBottom: 8,
   },
   chipRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingRight: 16,
   },
   bucketChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   bucketChipText: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: colors.textPrimary,
+    color: colors.textSecond,
+  },
+  fundedHint: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 8,
+    lineHeight: 16,
   },
   textInput: {
     backgroundColor: colors.surface,
@@ -714,13 +619,13 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 8,
   },
   dateText: {
     fontSize: 15,
@@ -730,12 +635,8 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
   toggleLabel: {
     fontSize: 15,
@@ -749,36 +650,38 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   toggle: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
+    width: 48,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.border,
+    padding: 2,
     justifyContent: 'center',
-    paddingHorizontal: 2,
   },
   toggleActive: {
     backgroundColor: colors.green,
   },
   toggleKnob: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
   },
   toggleKnobActive: {
     alignSelf: 'flex-end',
   },
   footer: {
+    paddingTop: FOOTER_PAD_TOP,
     paddingHorizontal: 16,
-    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
+    backgroundColor: colors.pageBg,
   },
   saveButton: {
+    height: SAVE_BUTTON_HEIGHT,
     backgroundColor: colors.green,
     borderRadius: 14,
-    paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonDisabled: {
     opacity: 0.4,

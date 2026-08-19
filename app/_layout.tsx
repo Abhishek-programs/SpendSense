@@ -21,7 +21,6 @@ import {
 } from '@/lib/notifications'
 import { runMonthRollover } from '@/lib/bucket-balance'
 import { runSurplusRollover } from '@/lib/month-surplus'
-import { useOverlay } from '@/hooks/useOverlay'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -38,8 +37,6 @@ export default function RootLayout() {
   const { loadTransactions } = useTransactionsStore()
   const { loadGoals } = useGoalsStore()
   const { loadContacts, loadEntries, loadAllEntries } = useLendingStore()
-
-  useOverlay()
 
   useEffect(() => {
     setStatusBarStyle('dark', true)

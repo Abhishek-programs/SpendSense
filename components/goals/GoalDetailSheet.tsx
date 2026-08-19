@@ -9,6 +9,8 @@ import {
   Alert,
   TextInput,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,6 +21,7 @@ import { useBucketsStore } from '@/store/buckets'
 import { projectGoal } from '@/lib/projection'
 import { GOAL_BUCKET_LABELS } from '@/lib/goals/plan'
 import { PieChart } from 'react-native-gifted-charts'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 
 interface GoalDetailSheetProps {
   goal: (Goal & { current: number; color: string }) | null
@@ -32,6 +35,7 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
   const { buckets, loadBuckets } = useBucketsStore()
   const [editingMonthly, setEditingMonthly] = useState(false)
   const [monthlyDraft, setMonthlyDraft] = useState('')
+  const keyboardHeight = useKeyboardHeight(visible && editingMonthly)
 
   useEffect(() => {
     if (!visible) return
@@ -99,7 +103,19 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(40, keyboardHeight > 0 ? keyboardHeight + 24 : 0) },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+        >
           {/* Main Chart */}
           <View style={styles.chartContainer}>
             <PieChart
@@ -215,6 +231,7 @@ export function GoalDetailSheet({ goal, visible, onClose, onEdit }: GoalDetailSh
             </TouchableOpacity>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   )

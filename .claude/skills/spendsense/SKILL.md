@@ -12,7 +12,6 @@ Read **[AGENTS.md](../../../AGENTS.md)** before making changes. It is the single
 - **Logic:** `docs/core-function.md`
 - **UI / features:** `docs/design-and-features.md`
 - **Next tasks:** `BUILD_ORDER.md`
-- **Overlay only:** `docs/overlay-v2.md` — native Kotlin in `native/android/screenshotbubble/`; headless OCR in `lib/overlay-headless.ts`
 
 ## Hard rules (summary)
 
@@ -20,7 +19,7 @@ Read **[AGENTS.md](../../../AGENTS.md)** before making changes. It is the single
 - Categorization: keyword word match (description / remarks / merchant) → sure-shot merchant → fallback + flag.
 - EF target = Core Living × `EF_MULTIPLIER` — not income.
 - Safe to spend unlocks after salary confirmed this month (`__salary__` txn).
-- `[+]` opens `ManualEntrySheet` — not a tab.
+- `[+]` opens `ManualEntrySheet` — not a tab. Manual entry only (no OCR / share).
 - No tests, no drive-by refactors, no extra scope.
 
 ## Other skills

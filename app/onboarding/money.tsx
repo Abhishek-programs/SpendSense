@@ -47,7 +47,7 @@ function MoneyFields({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.formArea}>
-        <View style={styles.inputGroup} onLayout={incomeField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>MONTHLY TAKE-HOME MONEY</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -63,7 +63,7 @@ function MoneyFields({
           </View>
         </View>
 
-        <View style={styles.inputGroup} onLayout={cashField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>CASH ON HAND (OPTIONAL)</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -80,7 +80,7 @@ function MoneyFields({
           <Text style={styles.hint}>Money in your account now — adds to Your money on Home</Text>
         </View>
 
-        <View style={styles.inputGroup} onLayout={startDayField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>MONTH START DATE</Text>
           <View style={styles.inputWrapper}>
             <Ionicons name="calendar-outline" size={20} color={colors.textSecond} style={{ marginRight: 8 }} />
@@ -98,7 +98,7 @@ function MoneyFields({
           </View>
         </View>
 
-        <View style={styles.inputGroup} onLayout={ageField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>YOUR AGE (OPTIONAL)</Text>
           <View style={styles.inputWrapper}>
             <TextInput

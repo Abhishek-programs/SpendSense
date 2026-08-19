@@ -8,49 +8,31 @@ What's shipped and what's next. For stack and rules see [AGENTS.md](./AGENTS.md)
 
 | Area | Status |
 |---|---|
-| DB + Drizzle + seed + migrations (through `m0008` description column) | Done |
+| DB + Drizzle + seed + migrations | Done |
 | Zustand stores + root hydration + month rollover / surplus carry-forward | Done |
-| 6-step onboarding (Foundations → Goals → Bucket Builder → Balances) | Done |
-| Home — Your money → ring → lent/borrow → Living → Future (EF + progress in Future) | Done |
-| Lent & borrowed — contacts, person ledger, settle up, ring slice, net worth, FAB toggle | Done |
-| Full-app design polish — ring chips, animations, safe-area headers, chart labels | Done |
-| Salary-gated safe to spend (checklist unlocks ring for the month) | Done |
+| 6-step onboarding (Foundations → Bucket Builder → Goals → Balances) | Done |
+| Home — Your money → ring → lent/borrow → Living → Future | Done |
+| Lent & borrowed — contacts, person ledger, settle up | Done |
+| Salary-gated safe to spend | Done |
 | Personal accumulating fund + cap prompts | Done |
-| Goal completion → Vault archived + reallocation prompt | Done |
-| Month start checklist with undo confirmation | Done |
-| Manual entry — description / merchant fields, word-based categorize | Done |
-| Gallery OCR + overlay bubble (dev client) | Done |
+| Goals / Vault | Done |
+| Month start checklist | Done |
+| **Manual entry only** (expense / income / lend-borrow) via center [+] | Done |
 | Transactions ledger + charts + detail sheet | Done |
-| Vault — active / completed goals, SIP age-based target hint | Done |
 | Settings — playbook, buckets, keywords, notifications, CSV export | Done |
-| Docs — `core-function.md`, `design-and-features.md` | Done |
+
+**Removed from scope (for now):** OCR / gallery scan, share-to-app, scan bubble overlay.
 
 ---
 
-## Next (device verification)
+## Next
 
-### OCR
-
-- [ ] EAS dev client: `eas build --profile development --platform android`
-- [ ] Gallery scan with real eSewa/Khalti receipts; tune `lib/ocr-templates/`
-
-### Overlay
-
-- [ ] Dev client build (`npx expo prebuild --clean && npx expo run:android`)
-- [ ] Grant overlay + **app usage access** + screen capture in Settings → Scan Bubble
-- [ ] Bubble visible only on whitelisted apps (eSewa, Khalti, Chrome, …)
-- [ ] Tap bubble → headless OCR → transaction saved with `source: overlay` + toast
-
-See [docs/overlay-v2.md](./docs/overlay-v2.md) for architecture.
-
-### Polish
-
-- [x] Home reorder, EF in Future, compact ring chips, section animations (see `design-and-features.md`)
-- [ ] Geist Mono fonts per `docs/design.md` (optional)
-- [ ] Auto-create recurring drafts on month start (PRD F5)
+- [ ] Use the app daily — log expenses via [+]
+- [ ] Optional polish (fonts, recurring auto-drafts) when needed
+- [ ] Capture / OCR later if manual entry gets tedious
 
 ---
 
-## Exploratory (no timeline)
+## Deferred / out of scope
 
-AI insights in `ai/` — tap-triggered only, no chat. Needs 3+ months of real data first.
+- Share intent, SMS/email ingest, dark mode, AI chat, iOS, cloud sync

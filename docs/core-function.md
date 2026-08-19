@@ -62,15 +62,19 @@ Monthly take-home (playbook)
 ## Bucket behaviors
 
 ### Regular spending (Core Living, Dates, Fun)
-- Monthly budget resets; bar = spent / limit
+- Monthly **ceiling** (not a spend target); Home shows spent first, ceiling second
+- Bar = spent / ceiling
 - Core Living: household & groceries
+- Optional: savings contributions can be **funded from** a spending bucket (counts toward that ceiling + fills destination)
 
 ### Personal fund
 - Top-up each month, balance rolls over, cap default NPR 20,000
 - Cap prompts: reallocate, raise cap, or raise for specific purchase
+- Can **fund** EF/savings contributions (balance decreases)
 
 ### Savings / investment
 - Confirmed via `__savings_confirm__` transactions
+- Optional `funded_from_bucket_id` when contribution came from Living/Personal
 - EF target = 6× **Core Living** monthly amount
 
 ### Goals

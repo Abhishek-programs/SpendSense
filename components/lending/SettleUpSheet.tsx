@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Modal,
   View,
@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
 import { formatNPR, formatNPRShort } from '@/lib/format'
-import { useEffect } from 'react'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 
 interface SettleUpSheetProps {
   visible: boolean
@@ -29,6 +32,8 @@ export function SettleUpSheet({
   onConfirm,
   onClose,
 }: SettleUpSheetProps) {
+  const insets = useSafeAreaInsets()
+  const keyboardHeight = useKeyboardHeight(visible)
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -63,46 +68,57 @@ export function SettleUpSheet({
   }
 
   const receiving = balance > 0
+  const sheetLift = keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <SafeAreaView style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Settle up</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={22} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.sub}>
-            {receiving
-              ? `${personName} owes you NPR ${formatNPRShort(balance)}`
-              : `You owe ${personName} NPR ${formatNPRShort(Math.abs(balance))}`}
-          </Text>
-
-          <Text style={styles.label}>Amount</Text>
-          <TextInput
-            style={styles.input}
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-          />
-          <Text style={styles.hint}>
-            {receiving ? 'They paid you back' : 'You paid them'} · max NPR {formatNPR(maxAmount)}
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.btn, (parsed <= 0 || parsed > maxAmount) && styles.btnDisabled]}
-            onPress={handleConfirm}
-            disabled={parsed <= 0 || parsed > maxAmount || saving}
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboard}
+        >
+          <Pressable
+            style={[styles.sheet, { marginBottom: sheetLift }]}
+            onPress={e => e.stopPropagation()}
           >
-            <Text style={styles.btnText}>{saving ? 'Saving...' : 'Confirm settlement'}</Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-      </View>
+            <SafeAreaView edges={['bottom']}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Settle up</Text>
+                <TouchableOpacity onPress={onClose} hitSlop={12}>
+                  <Ionicons name="close" size={22} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.sub}>
+                {receiving
+                  ? `${personName} owes you NPR ${formatNPRShort(balance)}`
+                  : `You owe ${personName} NPR ${formatNPRShort(Math.abs(balance))}`}
+              </Text>
+
+              <Text style={styles.label}>Amount</Text>
+              <TextInput
+                style={styles.input}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.hint}>
+                {receiving ? 'They paid you back' : 'You paid them'} · max NPR {formatNPR(maxAmount)}
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.btn, (parsed <= 0 || parsed > maxAmount) && styles.btnDisabled]}
+                onPress={handleConfirm}
+                disabled={parsed <= 0 || parsed > maxAmount || saving}
+              >
+                <Text style={styles.btnText}>{saving ? 'Saving...' : 'Confirm settlement'}</Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
     </Modal>
   )
 }
@@ -113,12 +129,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
+  keyboard: {
+    justifyContent: 'flex-end',
+  },
   sheet: {
     backgroundColor: colors.pageBg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: 8,
   },
   header: {
     flexDirection: 'row',

@@ -42,7 +42,7 @@ function BalancesFields({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.formArea}>
-        <View style={styles.inputGroup} onLayout={sipField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>TOTAL SIP INVESTED TO DATE</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -59,7 +59,7 @@ function BalancesFields({
           <Text style={styles.hint}>Cumulative amount put into SIPs</Text>
         </View>
 
-        <View style={styles.inputGroup} onLayout={sharesField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>TOTAL SHARES INVESTED TO DATE</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>

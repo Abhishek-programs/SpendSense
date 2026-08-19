@@ -26,6 +26,7 @@ import {
   monthsBetween,
   parseTargetDate,
 } from '@/lib/goals/plan'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 
 type PaymentChoice = 'pay_in_full' | 'upfront_emi' | 'not_sure'
 
@@ -151,12 +152,15 @@ export function AddGoalSheet({ visible, onClose, editGoal }: AddGoalSheetProps) 
     target > 0 &&
     (parseFloat(monthlyContribution) > 0 || (plan?.totalMonthly ?? backCalc) > 0)
 
+  const keyboardHeight = useKeyboardHeight(visible)
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} hitSlop={12}>
@@ -168,7 +172,14 @@ export function AddGoalSheet({ visible, onClose, editGoal }: AddGoalSheetProps) 
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(40, keyboardHeight > 0 ? keyboardHeight + 24 : 0) },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+          >
             <View style={styles.field}>
               <Text style={styles.label}>GOAL NAME</Text>
               <TextInput

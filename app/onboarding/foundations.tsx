@@ -47,7 +47,7 @@ function FoundationsFields({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.formArea}>
-        <View style={styles.inputGroup} onLayout={coreField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>CORE LIVING (MONTHLY)</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -75,7 +75,7 @@ function FoundationsFields({
           </Text>
         </View>
 
-        <View style={styles.inputGroup} onLayout={efFloorField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>EF TARGET (FLOOR)</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -91,7 +91,7 @@ function FoundationsFields({
           </View>
         </View>
 
-        <View style={styles.inputGroup} onLayout={efBalanceField.onLayout}>
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>CURRENT EF BALANCE</Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.prefix}>NPR</Text>
@@ -136,7 +136,7 @@ export default function OnboardingFoundationsScreen() {
       await updateBucket(coreLivingBucket.id, { monthlyAmount: coreAmount })
     }
     await updatePlaybook({ efFloor: floorValue, efStartBalance: balanceValue })
-    router.push('/onboarding/goals')
+    router.push('/onboarding/buckets')
   }
 
   return (

@@ -175,7 +175,9 @@ CREATE TABLE \`lend_borrow_entries\` (
 \`created_at\` text NOT NULL
 );`
 
+const m0010 = `ALTER TABLE \`transactions\` ADD COLUMN \`funded_from_bucket_id\` text;`
+
 export const migrations = {
   journal,
-  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009 },
+  migrations: { m0000, m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009, m0010 },
 }

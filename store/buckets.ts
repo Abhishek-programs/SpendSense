@@ -6,7 +6,7 @@ import { db } from '@/db/client'
 
 import { buckets, keywordMappings, sureShotMerchants } from '@/db/schema'
 
-import { EF_BUCKET_ID, isNonRemovableBucket } from '@/constants/defaults'
+import { EF_BUCKET_ID, GOAL_BUCKET_COLOR, GOAL_BUCKET_ICON, GOAL_POOL_BUCKET_ID, isNonRemovableBucket } from '@/constants/defaults'
 
 import { ensureBalanceRow, loadAllBucketBalances } from '@/lib/bucket-balance'
 
@@ -97,6 +97,8 @@ interface BucketsState {
   refreshBalances: () => Promise<void>
 
   addBucket: (bucket: Omit<Bucket, 'id'>) => Promise<void>
+
+  ensureGoalPoolBucket: () => Promise<void>
 
   updateBucket: (id: string, patch: Partial<Bucket>) => Promise<void>
 
@@ -229,6 +231,52 @@ export const useBucketsStore = create<BucketsState>((set, get) => ({
       await ensureBalanceRow(id)
 
     }
+
+    await get().loadBuckets()
+
+  },
+
+
+
+  ensureGoalPoolBucket: async () => {
+
+    if (get().buckets.some(b => b.id === GOAL_POOL_BUCKET_ID)) return
+
+    await db.insert(buckets).values({
+
+      id: GOAL_POOL_BUCKET_ID,
+
+      name: 'Saving towards goal',
+
+      type: 'savings',
+
+      monthlyAmount: 0,
+
+      color: GOAL_BUCKET_COLOR,
+
+      icon: GOAL_BUCKET_ICON,
+
+      sortOrder: 5,
+
+      isActive: true,
+
+      showOnHome: true,
+
+      linkedGoalId: null,
+
+      goalBucketRole: null,
+
+      accumulates: false,
+
+      accumulationCap: null,
+
+      capOverride: null,
+
+      capOverrideReason: null,
+
+      capOverridePurchaseAmount: null,
+
+    }).onConflictDoNothing()
 
     await get().loadBuckets()
 
