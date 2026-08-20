@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 
 import { colors } from '@/constants/colors'
 
-import { formatNPRShort } from '@/lib/format'
+import { formatNPR, formatNPRShort } from '@/lib/format'
 
 
 
@@ -20,6 +20,7 @@ interface YourMoneyCardProps {
   lentOutAsset?: number
   youOweLiability?: number
   emptyHint?: string
+  accountBalances?: { id: string; name: string; balance: number }[]
 }
 
 export function NetWorthCard({
@@ -32,6 +33,7 @@ export function NetWorthCard({
   lentOutAsset = 0,
   youOweLiability = 0,
   emptyHint,
+  accountBalances = [],
 }: YourMoneyCardProps) {
 
   const [expanded, setExpanded] = useState(false)
@@ -58,7 +60,7 @@ export function NetWorthCard({
 
           <Text style={styles.label}>Your money</Text>
 
-          <Text style={styles.value}>{formatNPRShort(availableBalance)}</Text>
+          <Text style={styles.value}>{formatNPR(availableBalance)}</Text>
 
           <Text style={styles.sub}>
 
@@ -147,6 +149,32 @@ export function NetWorthCard({
               <Text style={styles.breakdownValue}>{formatNPRShort(stillInBank)}</Text>
 
             </View>
+
+          )}
+
+
+
+          {accountBalances.length > 0 && (
+
+            <>
+
+              <View style={styles.divider} />
+
+              <Text style={styles.sectionTitle}>Where it sits</Text>
+
+              {accountBalances.map(a => (
+
+                <View key={a.id} style={styles.breakdownRow}>
+
+                  <Text style={styles.breakdownLabel}>{a.name}</Text>
+
+                  <Text style={styles.breakdownValue}>{formatNPR(a.balance)}</Text>
+
+                </View>
+
+              ))}
+
+            </>
 
           )}
 

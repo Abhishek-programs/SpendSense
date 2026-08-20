@@ -36,9 +36,14 @@ import {
   goals as goalsTable,
   contacts as contactsTable,
   lendBorrowEntries as lendBorrowEntriesTable,
+  accounts as accountsTable,
+  accountTransfers as accountTransfersTable,
+  accountAdjustments as accountAdjustmentsTable,
 } from '@/db/schema'
 import { seedDefaults } from '@/db/seed'
 import { useLendingStore } from '@/store/lending'
+import { useAccountsStore } from '@/store/accounts'
+import { BANK_ACCOUNT_ID, ESEWA_ACCOUNT_ID } from '@/constants/accounts'
 import {
   getPaymentWatchEnabled,
   hasPaymentWatchUsageAccess,
@@ -280,6 +285,180 @@ function useSavedFeedback() {
     }).start()
   }
   return { opacity, show }
+}
+
+function MoneyLocationsCard() {
+  const { accounts, addFoundMoney, transfer, loadAccounts } = useAccountsStore()
+  const [mode, setMode] = useState<'idle' | 'add' | 'move'>('idle')
+  const [amount, setAmount] = useState('')
+  const [destId, setDestId] = useState(BANK_ACCOUNT_ID)
+  const [fromId, setFromId] = useState(BANK_ACCOUNT_ID)
+  const [toId, setToId] = useState(ESEWA_ACCOUNT_ID)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    loadAccounts()
+  }, [loadAccounts])
+
+  const parsed = Math.round((parseFloat(amount.replace(/,/g, '')) || 0) * 1000) / 1000
+
+  const reset = () => {
+    setMode('idle')
+    setAmount('')
+    setDestId(BANK_ACCOUNT_ID)
+    setFromId(BANK_ACCOUNT_ID)
+    setToId(ESEWA_ACCOUNT_ID)
+  }
+
+  const onAdd = async () => {
+    if (parsed <= 0 || busy) return
+    setBusy(true)
+    try {
+      await addFoundMoney(destId, parsed, 'Found money')
+      reset()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onMove = async () => {
+    if (parsed <= 0 || fromId === toId || busy) return
+    setBusy(true)
+    try {
+      await transfer(fromId, toId, parsed)
+      reset()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionHeader
+        title="Money locations"
+        description="Where Your money sits — Bank, eSewa, Cash. Add found cash or move between wallets."
+      />
+      <Card>
+        {accounts.map((a, i) => (
+          <View key={a.id}>
+            {i > 0 && <View style={styles.divider} />}
+            <View style={styles.toggleRow}>
+              <Text style={styles.editableLabel}>{a.name}</Text>
+              <Text style={styles.editableValue}>NPR {formatNPR(a.balance)}</Text>
+            </View>
+          </View>
+        ))}
+        <View style={styles.divider} />
+        {mode === 'idle' && (
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => setMode('add')} style={[styles.actionButton, { flex: 1 }]}>
+              <Text style={styles.actionButtonText}>Add money</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMode('move')} style={[styles.actionButton, { flex: 1 }]}>
+              <Text style={styles.actionButtonText}>Move</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {mode === 'add' && (
+          <View>
+            <Text style={styles.editableLabel}>Amount</Text>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={[styles.editableLabel, { marginTop: 12 }]}>Into</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {accounts.map(a => (
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => setDestId(a.id)}
+                  style={[
+                    styles.typeChip,
+                    destId === a.id && { backgroundColor: colors.greenFill, borderColor: colors.green },
+                  ]}
+                >
+                  <Text style={[styles.typeChipText, destId === a.id && { color: colors.green }]}>
+                    {a.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.editorActions}>
+              <TouchableOpacity onPress={reset}>
+                <Text style={{ color: colors.textMuted, fontSize: 14 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onAdd} disabled={parsed <= 0 || busy}>
+                <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {mode === 'move' && (
+          <View>
+            <Text style={styles.editableLabel}>Amount</Text>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={[styles.editableLabel, { marginTop: 12 }]}>From</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {accounts.map(a => (
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => setFromId(a.id)}
+                  style={[
+                    styles.typeChip,
+                    fromId === a.id && { backgroundColor: colors.greenFill, borderColor: colors.green },
+                  ]}
+                >
+                  <Text style={[styles.typeChipText, fromId === a.id && { color: colors.green }]}>
+                    {a.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.editableLabel, { marginTop: 12 }]}>To</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {accounts.map(a => (
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => setToId(a.id)}
+                  style={[
+                    styles.typeChip,
+                    toId === a.id && { backgroundColor: colors.greenFill, borderColor: colors.green },
+                  ]}
+                >
+                  <Text style={[styles.typeChipText, toId === a.id && { color: colors.green }]}>
+                    {a.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.editorActions}>
+              <TouchableOpacity onPress={reset}>
+                <Text style={{ color: colors.textMuted, fontSize: 14 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onMove} disabled={parsed <= 0 || fromId === toId || busy}>
+                <Text style={{ color: colors.green, fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>
+                  Move
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </Card>
+    </>
+  )
 }
 
 function PaymentWatchCard() {
@@ -581,6 +760,9 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await db.delete(transactions)
+              await db.delete(accountTransfersTable)
+              await db.delete(accountAdjustmentsTable)
+              await db.delete(accountsTable)
               await db.delete(lendBorrowEntriesTable)
               await db.delete(contactsTable)
               await db.delete(goalsTable)
@@ -600,6 +782,7 @@ export default function SettingsScreen() {
               await useLendingStore.getState().loadContacts()
               await useLendingStore.getState().loadAllEntries()
               await useLendingStore.getState().loadEntries(start, end)
+              await useAccountsStore.getState().loadAccounts()
               Alert.alert('Done', 'All data cleared and defaults restored.')
             } catch (e) {
               Alert.alert('Error', e instanceof Error ? e.message : 'Could not clear data')
@@ -987,6 +1170,8 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           )}
         </Card>
+
+        <MoneyLocationsCard />
 
         <PaymentWatchCard />
 

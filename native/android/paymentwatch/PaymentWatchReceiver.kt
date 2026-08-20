@@ -25,7 +25,8 @@ class PaymentWatchReceiver : BroadcastReceiver() {
     }
     val pkg = intent.getStringExtra(PaymentWatchService.EXTRA_PACKAGE).orEmpty()
     val appName = PaymentWatchPrefs.merchantLabel(pkg)
-    val id = PaymentWatchDb.insertFlaggedExpense(context, parsed.amount, appName, parsed.label)
+    val accountId = PaymentWatchDb.accountIdForPackage(pkg)
+    val id = PaymentWatchDb.insertFlaggedExpense(context, parsed.amount, appName, parsed.label, accountId)
     if (id == null) {
       Toast.makeText(context, "Could not save. Open SpendSense once, then try again.", Toast.LENGTH_SHORT).show()
       PaymentWatchService.start(context)

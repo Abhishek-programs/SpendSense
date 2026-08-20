@@ -26,6 +26,7 @@ import { usePlaybookStore } from "@/store/playbook";
 import { useTransactionsStore, INCOME_BUCKET_ID } from "@/store/transactions";
 import { useBucketsStore } from "@/store/buckets";
 import { useGoalsStore } from "@/store/goals";
+import { useAccountsStore } from "@/store/accounts";
 import { buildFutureGroups, checklistLabel } from "@/lib/goals/future-groups";
 
 import {
@@ -90,7 +91,17 @@ export default function HomeScreen() {
     assetBreakdown,
     hasAnyData,
     efValue,
+    moneyAccounts,
   } = usePulseData();
+
+  const { seedFromYourMoney, reconcileToYourMoney } = useAccountsStore();
+
+  useEffect(() => {
+    void (async () => {
+      await seedFromYourMoney(yourMoney);
+      await reconcileToYourMoney(yourMoney);
+    })();
+  }, [yourMoney, seedFromYourMoney, reconcileToYourMoney]);
 
   const [promptVisible, setPromptVisible] = useState(false);
   const [checklistVisible, setChecklistVisible] = useState(false);
@@ -445,6 +456,11 @@ export default function HomeScreen() {
           carriedForwardBalance={carriedForwardBalance}
           lentOutAsset={lentOutAsset}
           youOweLiability={youOweLiability}
+          accountBalances={moneyAccounts.map((a) => ({
+            id: a.id,
+            name: a.name,
+            balance: a.balance,
+          }))}
           breakdown={assetBreakdown.map((a) => ({
             label: a.name,
             value: a.value,

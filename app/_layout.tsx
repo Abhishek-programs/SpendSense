@@ -12,6 +12,7 @@ import { useBucketsStore } from '@/store/buckets'
 import { useTransactionsStore } from '@/store/transactions'
 import { useGoalsStore } from '@/store/goals'
 import { useLendingStore } from '@/store/lending'
+import { useAccountsStore } from '@/store/accounts'
 import { getMonthRange, getDaysRemaining } from '@/lib/month'
 import {
   requestPermissions,
@@ -39,6 +40,7 @@ export default function RootLayout() {
   const { loadTransactions } = useTransactionsStore()
   const { loadGoals } = useGoalsStore()
   const { loadContacts, loadEntries, loadAllEntries } = useLendingStore()
+  const { loadAccounts } = useAccountsStore()
 
   useEffect(() => {
     setStatusBarStyle('dark', true)
@@ -82,6 +84,7 @@ export default function RootLayout() {
     loadContacts()
     loadAllEntries()
     loadEntries(start, end)
+    loadAccounts()
   }, [playbookLoaded, isOnboarded])
 
   // Notification setup — runs once after onboarding
