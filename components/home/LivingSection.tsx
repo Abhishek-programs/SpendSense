@@ -33,7 +33,9 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
 
   const renderRegularRow = (bucket: Bucket, i: number) => {
     const spent = spentByBucket[bucket.id] ?? 0
-    const ratio = bucket.monthlyAmount > 0 ? spent / bucket.monthlyAmount : 0
+    const ceiling = bucket.monthlyAmount
+    const green = ceiling > 0 ? Math.max(0, (ceiling - spent) / ceiling) : 1
+    const red = ceiling > 0 ? Math.min(1, spent / ceiling) : 0
     return (
       <Animated.View
         key={bucket.id}
@@ -54,12 +56,15 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </Text>
         </View>
         <View style={styles.barWrap}>
-          {spent === 0 ? (
-            <Text style={styles.noTxnHint}>No transactions yet this month</Text>
-          ) : (
-            <ProgressBar value={ratio} height={4} />
-          )}
-          <Text style={styles.ceilingHint}>ceiling NPR {formatNPR(bucket.monthlyAmount)}</Text>
+          <ProgressBar
+            value={0}
+            height={4}
+            segments={{
+              green: spent > ceiling ? 0 : green,
+              red: spent > ceiling ? 1 : red,
+            }}
+          />
+          <Text style={styles.ceilingHint}>ceiling NPR {formatNPR(ceiling)}</Text>
         </View>
       </Animated.View>
     )
@@ -67,10 +72,13 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
 
   const renderFundRow = (bucket: Bucket, showDivider: boolean, i: number) => {
     const spent = spentByBucket[bucket.id] ?? 0
-    const balance = bucketBalances[bucket.id] ?? 0
-    const cap = effectiveCap(bucket) ?? bucket.monthlyAmount * 4
+    const balance = Math.max(0, bucketBalances[bucket.id] ?? 0)
+    const cap = Math.max(effectiveCap(bucket) ?? bucket.monthlyAmount * 4, 1)
     const topUp = bucket.monthlyAmount
-    const ratio = topUp > 0 ? spent / topUp : 0
+    // Cap as full width: green = still in fund, red = spent this month, grey = room to cap
+    const green = Math.min(1, balance / cap)
+    const red = Math.min(1, spent / cap)
+    const grey = Math.max(0, 1 - green - red)
 
     return (
       <Animated.View
@@ -92,11 +100,11 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </Text>
         </View>
         <View style={styles.barWrap}>
-          {spent === 0 ? (
-            <Text style={styles.noTxnHint}>No draws yet this month</Text>
-          ) : (
-            <ProgressBar value={ratio} height={4} />
-          )}
+          <ProgressBar
+            value={0}
+            height={4}
+            segments={{ green, red, grey }}
+          />
           <Text style={styles.fundHint}>
             Fund NPR {formatNPR(balance)} / {formatNPR(cap)} · +{formatNPR(topUp)}/mo · rolls over
           </Text>
