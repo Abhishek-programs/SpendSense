@@ -101,8 +101,13 @@ export function applySchemaPatches() {
     )
     if (!miscBucket) {
       sqlite.execSync(
-        `INSERT INTO \`buckets\` (\`id\`, \`name\`, \`type\`, \`monthly_amount\`, \`color\`, \`icon\`, \`sort_order\`, \`is_active\`, \`show_on_home\`, \`accumulates\`)
-         VALUES ('misc', 'Misc', 'spending', 3000, '#64748B', '📦', 5, 1, 1, 0)`
+        `INSERT OR IGNORE INTO \`buckets\` (\`id\`, \`name\`, \`type\`, \`monthly_amount\`, \`color\`, \`icon\`, \`sort_order\`, \`is_active\`, \`show_on_home\`, \`accumulates\`)
+         VALUES ('misc', 'Misc', 'spending', 3000, '#64748B', '📦', 4, 1, 1, 0)`
+      )
+    } else {
+      // Keep Misc active so payment helper / Living always include it
+      sqlite.execSync(
+        `UPDATE \`buckets\` SET \`is_active\` = 1, \`type\` = 'spending' WHERE \`id\` = 'misc' OR \`name\` = 'Misc'`
       )
     }
     const miscId = miscBucket?.id ?? 'misc'
@@ -138,6 +143,12 @@ export function applySchemaPatches() {
   }
   if (playbookTable && !hasColumn('playbook', 'last_personal_rebalance_prompt_month')) {
     sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_personal_rebalance_prompt_month\` text`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'personal_recovery_debt')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`personal_recovery_debt\` real DEFAULT 0`)
+  }
+  if (playbookTable && !hasColumn('playbook', 'personal_normal_top_up')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`personal_normal_top_up\` real`)
   }
 
   const balancesTable = sqlite.getFirstSync(

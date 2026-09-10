@@ -15,6 +15,8 @@ export const playbook = sqliteTable('playbook', {
   carriedForwardBalance: real('carried_forward_balance').default(0),
   lastSurplusRolloverMonth: text('last_surplus_rollover_month'),
   lastPersonalRebalancePromptMonth: text('last_personal_rebalance_prompt_month'),
+  personalRecoveryDebt: real('personal_recovery_debt').default(0),
+  personalNormalTopUp: real('personal_normal_top_up'),
 })
 
 export const buckets = sqliteTable('buckets', {

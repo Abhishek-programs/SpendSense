@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import {
   CORE_LIVING_BUCKET_ID,
@@ -10,7 +12,9 @@ import {
 import { colors } from '@/constants/colors'
 import { formatNPR } from '@/lib/format'
 import { effectiveCap } from '@/lib/bucket-balance'
+import { livingOvershoot, totalLivingOvershoot } from '@/lib/living-reallocate'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { LivingReallocateSheet } from '@/components/home/LivingReallocateSheet'
 import type { Bucket } from '@/store/buckets'
 
 const BUCKET_HINTS: Record<string, string> = {
@@ -25,17 +29,37 @@ interface LivingSectionProps {
   buckets: Bucket[]
   spentByBucket: Record<string, number>
   bucketBalances: Record<string, number>
+  personalRecoveryDebt?: number
 }
 
-export function LivingSection({ buckets, spentByBucket, bucketBalances }: LivingSectionProps) {
+export function LivingSection({
+  buckets,
+  spentByBucket,
+  bucketBalances,
+  personalRecoveryDebt = 0,
+}: LivingSectionProps) {
+  const [reallocateOpen, setReallocateOpen] = useState(false)
   const regularBuckets = buckets.filter(b => !b.accumulates)
   const fundBuckets = buckets.filter(b => b.accumulates)
+  const overTotal = totalLivingOvershoot(regularBuckets, spentByBucket)
 
   const renderRegularRow = (bucket: Bucket, i: number) => {
     const spent = spentByBucket[bucket.id] ?? 0
     const ceiling = bucket.monthlyAmount
-    const green = ceiling > 0 ? Math.max(0, (ceiling - spent) / ceiling) : 1
-    const red = ceiling > 0 ? Math.min(1, spent / ceiling) : 0
+    const over = livingOvershoot(bucket, spent)
+    let segments: { green: number; red: number; darkRed?: number }
+    if (over > 0 && spent > 0) {
+      segments = {
+        green: 0,
+        red: ceiling / spent,
+        darkRed: over / spent,
+      }
+    } else {
+      segments = {
+        green: ceiling > 0 ? Math.max(0, (ceiling - spent) / ceiling) : 1,
+        red: ceiling > 0 ? Math.min(1, spent / ceiling) : 0,
+      }
+    }
     return (
       <Animated.View
         key={bucket.id}
@@ -56,15 +80,12 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </Text>
         </View>
         <View style={styles.barWrap}>
-          <ProgressBar
-            value={0}
-            height={4}
-            segments={{
-              green: spent > ceiling ? 0 : green,
-              red: spent > ceiling ? 1 : red,
-            }}
-          />
-          <Text style={styles.ceilingHint}>ceiling NPR {formatNPR(ceiling)}</Text>
+          <ProgressBar value={0} height={4} segments={segments} />
+          <Text style={[styles.ceilingHint, over > 0 && { color: colors.redDark }]}>
+            {over > 0
+              ? `NPR ${formatNPR(over)} over · ceiling NPR ${formatNPR(ceiling)}`
+              : `ceiling NPR ${formatNPR(ceiling)}`}
+          </Text>
         </View>
       </Animated.View>
     )
@@ -75,10 +96,10 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
     const balance = Math.max(0, bucketBalances[bucket.id] ?? 0)
     const cap = Math.max(effectiveCap(bucket) ?? bucket.monthlyAmount * 4, 1)
     const topUp = bucket.monthlyAmount
-    // Cap as full width: green = still in fund, red = spent this month, grey = room to cap
     const green = Math.min(1, balance / cap)
     const red = Math.min(1, spent / cap)
     const grey = Math.max(0, 1 - green - red)
+    const emptyAndSpent = balance <= 0 && spent > 0
 
     return (
       <Animated.View
@@ -100,13 +121,14 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           </Text>
         </View>
         <View style={styles.barWrap}>
-          <ProgressBar
-            value={0}
-            height={4}
-            segments={{ green, red, grey }}
-          />
-          <Text style={styles.fundHint}>
-            Fund NPR {formatNPR(balance)} / {formatNPR(cap)} · +{formatNPR(topUp)}/mo · rolls over
+          <ProgressBar value={0} height={4} segments={{ green, red, grey }} />
+          <Text style={[styles.fundHint, emptyAndSpent && { color: colors.redDark }]}>
+            {emptyAndSpent
+              ? `Fund empty · draws from Your money`
+              : `Fund NPR ${formatNPR(balance)} / ${formatNPR(cap)} · +${formatNPR(topUp)}/mo · rolls over`}
+            {personalRecoveryDebt > 0
+              ? ` · recovering NPR ${formatNPR(personalRecoveryDebt)}`
+              : ''}
           </Text>
         </View>
       </Animated.View>
@@ -118,8 +140,20 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
   return (
     <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Living</Text>
-        <Text style={styles.subtitle}>Ceilings & personal fund</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Living</Text>
+          <Text style={styles.subtitle}>Ceilings & personal fund</Text>
+        </View>
+        {overTotal > 0 && (
+          <TouchableOpacity
+            onPress={() => setReallocateOpen(true)}
+            hitSlop={10}
+            style={styles.reallocateBtn}
+            accessibilityLabel="Reallocate living ceilings"
+          >
+            <Ionicons name="git-compare-outline" size={20} color={colors.amber} />
+          </TouchableOpacity>
+        )}
       </View>
       <View style={styles.card}>
         {regularBuckets.map((bucket, i) => renderRegularRow(bucket, i))}
@@ -134,6 +168,13 @@ export function LivingSection({ buckets, spentByBucket, bucketBalances }: Living
           <Text style={styles.empty}>No spending buckets</Text>
         )}
       </View>
+
+      <LivingReallocateSheet
+        visible={reallocateOpen}
+        onClose={() => setReallocateOpen(false)}
+        regularBuckets={regularBuckets}
+        spentByBucket={spentByBucket}
+      />
     </Animated.View>
   )
 }
@@ -144,6 +185,17 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  reallocateBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.amberFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
   },
   title: {
     fontSize: 18,
@@ -199,10 +251,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
-  amountsMuted: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-  },
   spentLabel: {
     fontFamily: 'Inter_400Regular',
     color: colors.textMuted,
@@ -221,12 +269,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: colors.textMuted,
     marginTop: 6,
-  },
-  noTxnHint: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textMuted,
-    fontStyle: 'italic',
   },
   empty: {
     paddingVertical: 16,

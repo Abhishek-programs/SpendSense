@@ -65,7 +65,8 @@ export default function RootLayout() {
       if (isOnboarded) {
         runMonthRollover(pb.monthStartDay, pb.lastBalanceRolloverMonth).then(async monthKey => {
           if (monthKey !== pb.lastBalanceRolloverMonth) {
-            await pb.updatePlaybook({ lastBalanceRolloverMonth: monthKey })
+            await usePlaybookStore.getState().loadPlaybook()
+            await usePlaybookStore.getState().updatePlaybook({ lastBalanceRolloverMonth: monthKey })
             await useBucketsStore.getState().loadBuckets()
           }
           const surplusKey = await runSurplusRollover(
@@ -73,8 +74,8 @@ export default function RootLayout() {
             pb.lastSurplusRolloverMonth,
           )
           if (surplusKey !== pb.lastSurplusRolloverMonth) {
-            await pb.updatePlaybook({ lastSurplusRolloverMonth: surplusKey })
             await usePlaybookStore.getState().loadPlaybook()
+            await usePlaybookStore.getState().updatePlaybook({ lastSurplusRolloverMonth: surplusKey })
           }
         })
       }

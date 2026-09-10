@@ -154,6 +154,18 @@ function withPaymentWatch(config) {
       })
     }
 
+    if (!app.activity) app.activity = []
+    if (!app.activity.some((a) => a.$['android:name'] === '.paymentwatch.PaymentWatchPickActivity')) {
+      app.activity.push({
+        $: {
+          'android:name': '.paymentwatch.PaymentWatchPickActivity',
+          'android:exported': 'false',
+          'android:theme': '@android:style/Theme.DeviceDefault.Light.Dialog.NoActionBar',
+          'android:excludeFromRecents': 'true',
+        },
+      })
+    }
+
     return cfg
   })
 

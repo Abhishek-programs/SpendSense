@@ -39,7 +39,7 @@ class PaymentWatchReceiver : BroadcastReceiver() {
       PaymentWatchPrefs.setDoneThisVisit(context, true)
       PaymentWatchService.clearLogUi(context)
     }
-    Toast.makeText(context, "Logged NPR ${parsed.amount.toInt()} — tap a bucket", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "Logged NPR ${parsed.amount.toInt()} — pick a bucket", Toast.LENGTH_SHORT).show()
     PaymentWatchService.start(context)
   }
 

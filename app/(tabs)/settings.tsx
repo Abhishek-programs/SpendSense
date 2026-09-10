@@ -1171,6 +1171,38 @@ export default function SettingsScreen() {
           )}
         </Card>
 
+        {(pb.personalRecoveryDebt ?? 0) > 0 && (
+          <>
+            <SectionHeader
+              title="Personal recovery"
+              description={`Top-up is NPR 1,000/mo until NPR ${formatNPR(pb.personalRecoveryDebt)} is recovered.`}
+            />
+            <Card>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Reset Personal recovery?',
+                    'Restores full Personal top-up starting next month rollover (debt cleared now).',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset',
+                        style: 'destructive',
+                        onPress: () => pb.resetPersonalRecovery(),
+                      },
+                    ],
+                  )
+                }}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.red }]}>
+                  Reset Personal recovery
+                </Text>
+              </TouchableOpacity>
+            </Card>
+          </>
+        )}
+
         <MoneyLocationsCard />
 
         <PaymentWatchCard />

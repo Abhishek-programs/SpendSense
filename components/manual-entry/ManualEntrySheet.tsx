@@ -26,6 +26,7 @@ import { useLendingStore } from '@/store/lending'
 import { LendBorrowForm } from '@/components/lending/LendBorrowForm'
 import { useAccountsStore } from '@/store/accounts'
 import { BANK_ACCOUNT_ID, defaultAccountId } from '@/constants/accounts'
+import { PERSONAL_BUCKET_ID } from '@/constants/defaults'
 
 const SAVE_BUTTON_HEIGHT = 56
 const FOOTER_PAD_TOP = 16
@@ -43,7 +44,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
 
   const { getSpendingBuckets, getSavingsBuckets, keywordMappings, sureShotMerchants, buckets } =
     useBucketsStore()
-  const { fallbackBucketId } = usePlaybookStore()
+  const { fallbackBucketId, startPersonalRecovery } = usePlaybookStore()
   const { addTransaction } = useTransactionsStore()
   const { addEntry: addLendEntry } = useLendingStore()
   const { accounts: moneyAccounts } = useAccountsStore()
@@ -175,9 +176,12 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
           ? buckets.find(b => b.id === fundedFrom)
           : buckets.find(b => b.id === finalBucketId)
         if (overspent && overspendBucket?.accumulates) {
+          if (overspendBucket.id === PERSONAL_BUCKET_ID) {
+            await startPersonalRecovery(overspent, overspendBucket.monthlyAmount)
+          }
           Alert.alert(
             'Personal fund empty',
-            `Personal fund empty — NPR ${formatNPR(overspent)} overspent.`,
+            `Personal fund empty — NPR ${formatNPR(overspent)} from Your money. Top-up drops to NPR 1,000/mo until recovered.`,
           )
         }
       }

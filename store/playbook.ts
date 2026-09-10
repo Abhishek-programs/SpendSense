@@ -24,12 +24,16 @@ interface PlaybookState {
   carriedForwardBalance: number
   lastSurplusRolloverMonth: string | null
   lastPersonalRebalancePromptMonth: string | null
+  personalRecoveryDebt: number
+  personalNormalTopUp: number | null
   nudgeToggles: NudgeToggles
   lastNotificationDate: string | null
   isLoaded: boolean
   loadPlaybook: () => Promise<void>
-  updatePlaybook: (patch: Partial<Omit<PlaybookState, 'isLoaded' | 'loadPlaybook' | 'updatePlaybook'>>) => Promise<void>
+  updatePlaybook: (patch: Partial<Omit<PlaybookState, 'isLoaded' | 'loadPlaybook' | 'updatePlaybook' | 'setOnboarded' | 'startPersonalRecovery' | 'resetPersonalRecovery'>>) => Promise<void>
   setOnboarded: () => Promise<void>
+  startPersonalRecovery: (overspent: number, normalTopUp: number) => Promise<void>
+  resetPersonalRecovery: () => Promise<void>
 }
 
 export const usePlaybookStore = create<PlaybookState>((set, get) => ({
@@ -46,6 +50,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
   carriedForwardBalance: 0,
   lastSurplusRolloverMonth: null,
   lastPersonalRebalancePromptMonth: null,
+  personalRecoveryDebt: 0,
+  personalNormalTopUp: null,
   nudgeToggles: {
     budgetBreach: true,
     savingsReminder: true,
@@ -73,6 +79,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         carriedForwardBalance: row.carriedForwardBalance ?? 0,
         lastSurplusRolloverMonth: row.lastSurplusRolloverMonth ?? null,
         lastPersonalRebalancePromptMonth: row.lastPersonalRebalancePromptMonth ?? null,
+        personalRecoveryDebt: row.personalRecoveryDebt ?? 0,
+        personalNormalTopUp: row.personalNormalTopUp ?? null,
         isLoaded: true,
       })
     } else {
@@ -99,6 +107,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         carriedForwardBalance: state.carriedForwardBalance,
         lastSurplusRolloverMonth: state.lastSurplusRolloverMonth,
         lastPersonalRebalancePromptMonth: state.lastPersonalRebalancePromptMonth,
+        personalRecoveryDebt: state.personalRecoveryDebt,
+        personalNormalTopUp: state.personalNormalTopUp,
       }).where(eq(playbook.id, rows[0].id))
     } else {
       // Create record if not exists (should already happen in seedDefaults, but good to have)
@@ -116,6 +126,8 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         carriedForwardBalance: state.carriedForwardBalance,
         lastSurplusRolloverMonth: state.lastSurplusRolloverMonth,
         lastPersonalRebalancePromptMonth: state.lastPersonalRebalancePromptMonth,
+        personalRecoveryDebt: state.personalRecoveryDebt,
+        personalNormalTopUp: state.personalNormalTopUp,
       })
     }
   },
@@ -126,5 +138,26 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
     if (rows.length > 0) {
       await db.update(playbook).set({ isOnboarded: true }).where(eq(playbook.id, rows[0].id))
     }
+  },
+
+  startPersonalRecovery: async (overspent, normalTopUp) => {
+    if (overspent <= 0) return
+    const state = get()
+    const debt = (state.personalRecoveryDebt || 0) + overspent
+    const normal =
+      state.personalNormalTopUp != null && state.personalNormalTopUp > 0
+        ? state.personalNormalTopUp
+        : normalTopUp
+    await get().updatePlaybook({
+      personalRecoveryDebt: debt,
+      personalNormalTopUp: normal,
+    })
+  },
+
+  resetPersonalRecovery: async () => {
+    await get().updatePlaybook({
+      personalRecoveryDebt: 0,
+      personalNormalTopUp: null,
+    })
   },
 }))

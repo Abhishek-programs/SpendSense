@@ -59,6 +59,7 @@ export default function HomeScreen() {
     monthlyIncome,
     lastChecklistMonth,
     efFloor,
+    personalRecoveryDebt,
     updatePlaybook,
   } = usePlaybookStore();
   const {
@@ -494,6 +495,7 @@ export default function HomeScreen() {
           buckets={spendingBuckets}
           spentByBucket={spentByBucket}
           bucketBalances={bucketBalances}
+          personalRecoveryDebt={personalRecoveryDebt}
         />
 
         {/* Future — Savings checklist */}
