@@ -110,7 +110,15 @@ export function NetWorthCard({
 
             </View>
 
-            <Text style={styles.breakdownValue}>{formatNPRShort(monthRemainingBalance)}</Text>
+            <Text
+              style={[
+                styles.breakdownValue,
+                monthRemainingBalance < 0 && { color: colors.red },
+              ]}
+            >
+              {monthRemainingBalance < 0 ? '−' : ''}
+              {formatNPRShort(Math.abs(monthRemainingBalance))}
+            </Text>
 
           </View>
 

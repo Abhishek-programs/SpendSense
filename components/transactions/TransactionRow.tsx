@@ -40,6 +40,9 @@ export function TransactionRow({ transaction, bucketName, bucketColor, onPress }
             {subtitle}
           </Text>
         ) : null}
+        {transaction.feeAmount > 0 && (
+          <Text style={styles.fee}>fee NPR {formatNPR(transaction.feeAmount)}</Text>
+        )}
         <Text style={styles.date}>{formatDate(transaction.date)}</Text>
       </View>
 
@@ -92,6 +95,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     color: colors.textMuted,
+    marginTop: 2,
+  },
+  fee: {
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.amber,
     marginTop: 2,
   },
   center: {

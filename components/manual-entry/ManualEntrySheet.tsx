@@ -54,6 +54,8 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   const allBuckets = [...spendingBuckets, ...savingsBuckets]
 
   const [amount, setAmount] = useState('')
+  const [feeAmount, setFeeAmount] = useState('')
+  const [showFee, setShowFee] = useState(false)
   const [entryType, setEntryType] = useState<EntryType>('expense')
   const isIncome = entryType === 'income'
   const isLendBorrow = entryType === 'lend_borrow'
@@ -87,6 +89,8 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   useEffect(() => {
     if (!visible) return
     setAmount('')
+    setFeeAmount('')
+    setShowFee(false)
     setEntryType('expense')
     setSelectedBucketId(null)
     setFundedFromBucketId(null)
@@ -102,6 +106,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
   }, [visible])
 
   const parsedAmount = Math.round((parseFloat(amount.replace(/,/g, '')) || 0) * 1000) / 1000
+  const parsedFee = Math.round((parseFloat(feeAmount.replace(/,/g, '')) || 0) * 100) / 100
   const canSave = parsedAmount > 0 && (isIncome || selectedBucketId !== null)
 
   const handleSave = async () => {
@@ -159,6 +164,7 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
         const { overspent } = await addTransaction({
           type: 'expense',
           amount: parsedAmount,
+          feeAmount: parsedFee,
           description: description.trim() || null,
           merchant: merchant.trim() || (isSavingsDest ? destBucket?.name ?? null : null),
           bucketId: finalBucketId!,
@@ -303,7 +309,30 @@ export function ManualEntrySheet({ visible, onClose }: ManualEntrySheetProps) {
                     returnKeyType="done"
                     onSubmitEditing={() => Keyboard.dismiss()}
                   />
+                  {!isIncome && (
+                    <TouchableOpacity
+                      style={[styles.feeChip, showFee && styles.feeChipActive]}
+                      onPress={() => setShowFee(v => !v)}
+                    >
+                      <Text style={[styles.feeChipText, showFee && styles.feeChipTextActive]}>
+                        + Fee
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
+                {!isIncome && showFee && (
+                  <View style={styles.feeInputRow}>
+                    <Text style={styles.feePrefix}>Fee NPR</Text>
+                    <TextInput
+                      style={styles.feeInput}
+                      value={feeAmount}
+                      onChangeText={setFeeAmount}
+                      placeholder="0"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                )}
 
                 <View style={styles.section}>
                   <Text style={styles.label}>
@@ -627,6 +656,49 @@ const styles = StyleSheet.create({
     minWidth: 80,
     textAlign: 'center',
     padding: 0,
+  },
+  feeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    alignSelf: 'center',
+  },
+  feeChipActive: {
+    borderColor: colors.amber,
+    backgroundColor: colors.amberFill,
+  },
+  feeChipText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textMuted,
+  },
+  feeChipTextActive: {
+    color: colors.amber,
+  },
+  feeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.amber,
+    marginTop: -16,
+    marginBottom: 24,
+  },
+  feePrefix: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
+  },
+  feeInput: {
+    minWidth: 72,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    textAlign: 'right',
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
   },
   section: {
     marginBottom: 20,

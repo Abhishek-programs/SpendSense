@@ -19,6 +19,7 @@ interface PlaybookState {
   efStartBalance: number
   isOnboarded: boolean
   lastChecklistMonth: string | null
+  lastChecklistPromptMonth: string | null
   lastBalanceRolloverMonth: string | null
   userAge: number | null
   carriedForwardBalance: number
@@ -45,6 +46,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
   efStartBalance: 0,
   isOnboarded: false,
   lastChecklistMonth: null,
+  lastChecklistPromptMonth: null,
   lastBalanceRolloverMonth: null,
   userAge: null,
   carriedForwardBalance: 0,
@@ -74,6 +76,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         efStartBalance: row.efStartBalance ?? 0,
         isOnboarded: row.isOnboarded,
         lastChecklistMonth: row.lastChecklistMonth ?? null,
+        lastChecklistPromptMonth: row.lastChecklistPromptMonth ?? null,
         lastBalanceRolloverMonth: row.lastBalanceRolloverMonth ?? null,
         userAge: row.userAge ?? null,
         carriedForwardBalance: row.carriedForwardBalance ?? 0,
@@ -102,6 +105,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         efStartBalance: state.efStartBalance,
         isOnboarded: state.isOnboarded,
         lastChecklistMonth: state.lastChecklistMonth,
+        lastChecklistPromptMonth: state.lastChecklistPromptMonth,
         lastBalanceRolloverMonth: state.lastBalanceRolloverMonth,
         userAge: state.userAge,
         carriedForwardBalance: state.carriedForwardBalance,
@@ -121,6 +125,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         efStartBalance: state.efStartBalance,
         isOnboarded: state.isOnboarded,
         lastChecklistMonth: state.lastChecklistMonth,
+        lastChecklistPromptMonth: state.lastChecklistPromptMonth,
         lastBalanceRolloverMonth: state.lastBalanceRolloverMonth,
         userAge: state.userAge,
         carriedForwardBalance: state.carriedForwardBalance,

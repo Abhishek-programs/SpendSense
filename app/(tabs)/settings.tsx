@@ -737,12 +737,12 @@ export default function SettingsScreen() {
 
   const handleExportCSV = () => {
     const rows = txnStore.transactions
-    const header = 'Date,Type,Amount,Merchant,Bucket,Remarks,Source'
+    const header = 'Date,Type,Amount,Fee,Merchant,Bucket,Remarks,Source'
     const csvRows = rows.map(t => {
       const bucket = getBucketName(t.bucketId)
       const merchant = (t.merchant ?? '').replace(/,/g, ' ')
       const remarks = (t.remarks ?? '').replace(/,/g, ' ')
-      return `${t.date},${t.type},${t.amount},${merchant},${bucket},${remarks},${t.source}`
+      return `${t.date},${t.type},${t.amount},${t.feeAmount},${merchant},${bucket},${remarks},${t.source}`
     })
     const csv = [header, ...csvRows].join('\n')
     Alert.alert('CSV Export', `${rows.length} transactions exported.\n\n${csv.slice(0, 500)}${csv.length > 500 ? '...' : ''}`)

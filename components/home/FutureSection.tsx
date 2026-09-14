@@ -19,6 +19,7 @@ export interface FutureSectionProps {
   standaloneBuckets: Bucket[]
   confirmedBucketIds: Set<string>
   progressByBucket?: Record<string, BucketProgress>
+  chunksByBucket?: Record<string, number[]>
   efBucketId?: string
   showPlaceholder?: boolean
   onConfirm: (bucketId: string) => void
@@ -37,6 +38,7 @@ function ConfirmRow({
   progress,
   icon,
   accent,
+  chunks,
 }: {
   label: string
   hint?: string
@@ -47,6 +49,7 @@ function ConfirmRow({
   progress?: BucketProgress
   icon?: string
   accent?: string
+  chunks?: number[]
 }) {
   const pct =
     progress && progress.target > 0
@@ -88,9 +91,19 @@ function ConfirmRow({
           </View>
         )}
       </View>
-      <Text style={[styles.amount, confirmed && styles.amountConfirmed]}>
-        NPR {formatNPR(amount)}
-      </Text>
+      {chunks && chunks.length > 0 && !confirmed ? (
+        <View style={styles.chunks}>
+          {chunks.map((chunk, index) => (
+            <Text key={`${chunk}-${index}`} style={styles.chunk}>
+              +{formatNPR(chunk)}
+            </Text>
+          ))}
+        </View>
+      ) : (
+        <Text style={[styles.amount, confirmed && styles.amountConfirmed]}>
+          NPR {formatNPR(amount)}
+        </Text>
+      )}
     </TouchableOpacity>
   )
 }
@@ -100,6 +113,7 @@ export function FutureSection({
   standaloneBuckets,
   confirmedBucketIds,
   progressByBucket = {},
+  chunksByBucket = {},
   efBucketId,
   showPlaceholder,
   onConfirm,
@@ -127,6 +141,7 @@ export function FutureSection({
                 amount={group.buckets[0].monthlyAmount}
                 confirmed={confirmedBucketIds.has(group.buckets[0].id)}
                 progress={progressByBucket[group.buckets[0].id]}
+                chunks={chunksByBucket[group.buckets[0].id]}
                 onPress={() => onConfirm(group.buckets[0].id)}
               />
             ) : (
@@ -156,6 +171,7 @@ export function FutureSection({
                         amount={bucket.monthlyAmount}
                         confirmed={confirmedBucketIds.has(bucket.id)}
                         progress={progressByBucket[bucket.id]}
+                        chunks={chunksByBucket[bucket.id]}
                         onPress={() => onConfirm(bucket.id)}
                         indented
                       />
@@ -181,6 +197,7 @@ export function FutureSection({
                 amount={bucket.monthlyAmount}
                 confirmed={confirmedBucketIds.has(bucket.id)}
                 progress={progressByBucket[bucket.id]}
+                chunks={chunksByBucket[bucket.id]}
                 accent={isEF ? EF_ACCENT : undefined}
                 onPress={() => onConfirm(bucket.id)}
               />
@@ -326,6 +343,23 @@ const styles = StyleSheet.create({
   },
   amountConfirmed: {
     color: colors.textSecond,
+  },
+  chunks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 4,
+    maxWidth: 128,
+  },
+  chunk: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: colors.green,
+    backgroundColor: colors.greenFill,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    fontVariant: ['tabular-nums'],
   },
   empty: {
     paddingVertical: 16,

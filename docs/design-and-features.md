@@ -40,6 +40,8 @@ Net worth accordion: **Lent out** (asset) · **You owe** (liability).
 - Compact row below ring: net balance, tap → `/lending` person list
 - FAB third toggle: Lend/Borrow (person, direction, note, date)
 - Settle up reduces balance without logging income/expense
+- Lending entries can be edited/deleted; deleting a person removes their history
+- Paid settlements leave Your money; received settlements add to it
 - Ledger **Lending** filter shows lend/borrow/settle history
 
 ### Living
@@ -76,7 +78,7 @@ Goal cards use softened shadows; list rows stagger in with `FadeInDown`.
 
 ## Manual Entry
 
-Field order: **Amount** (auto-focus) → Bucket → **Funded from (optional)** when bucket is savings/investment → **Title** → Description (optional) → Notes (hidden for savings confirms) → Date.  
+Field order: **Amount** (auto-focus) + optional **Fee** chip → Bucket → **Funded from (optional)** when bucket is savings/investment → **Title** → Description (optional) → Notes (hidden for savings confirms) → Date. Fees debit cash but do not count toward bucket spend or investment principal.  
 Modes: Expense / Income / Lend-Borrow. Savings/investment destinations save as `__savings_confirm__`; optional funded-from debits that Living ceiling or Personal fund.
 
 ---
@@ -109,13 +111,17 @@ Playbook (income, month start, EF floor, age) · buckets · keywords · sure-sho
 
 ```
 effectiveIncome      = salary txn amount if confirmed this month else 0
-safeToSpend          = spendingPlan - lifestyleSpent - personalDraws + max(0, effectiveIncome - totalAllocations)
-availableBalance     = max(0, safeToSpend) + carriedForwardBalance
-yourMoney            = availableBalance + stillInBank
+safeToSpend          = spendingPlan - lifestyleSpent - personalDraws + max(0, effectiveIncome - totalAllocations) + lendingCashAdjust - fees
+yourMoney            = max(0, safeToSpend + carriedForwardBalance + stillInBank + foundMoney)
 stillInBank          = salary confirmed ? max(0, plannedSavings - confirmedSavedInvested) : 0
 efFloor              = coreLiving × 6
 suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
+nextCarry            = max(0, carriedForwardBalance + previousMonthSafeToSpend + previousMonthStillInBank)
 ```
+
+SIP confirms are shown in NPR 5,000 chunks (last chunk may be smaller); each chunk accepts its own fee. The Month Start Ritual auto-opens only once per playbook month while its pending banner remains available.
+
+Living overspend never reallocates or changes other bucket ceilings.
 
 ---
 

@@ -105,7 +105,10 @@ export function SettleUpSheet({
                 placeholderTextColor={colors.textMuted}
               />
               <Text style={styles.hint}>
-                {receiving ? 'They paid you back' : 'You paid them'} · max NPR {formatNPR(maxAmount)}
+                {receiving
+                  ? 'Adds to Your money'
+                  : 'Leaves Your money (this month + carried forward)'}{' '}
+                · max NPR {formatNPR(maxAmount)}
               </Text>
 
               <TouchableOpacity

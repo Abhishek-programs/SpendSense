@@ -66,6 +66,9 @@ export function usePulseData() {
     0,
   )
   const flaggedAmount = flaggedTransactions.reduce((s, t) => s + t.amount, 0)
+  const feesThisMonth = transactions
+    .filter(t => t.type === 'expense' && !t.isFlagged && !t.isRecurringDraft)
+    .reduce((s, t) => s + t.feeAmount, 0)
 
   const totalAllocations = activeBuckets.reduce((s, b) => s + b.monthlyAmount, 0)
   const plannedSavings = allSavingsBuckets
@@ -119,16 +122,19 @@ export function usePulseData() {
 
   const lendBorrowMonth = computeMonthMetrics(allEntries, start, end)
   const lendBorrowCashAdjust = lendBorrowMonth.lendBorrowCashAdjust
-  const adjustedSafeToSpend = safeToSpend + lendBorrowCashAdjust
+  const adjustedSafeToSpend = safeToSpend + lendBorrowCashAdjust - feesThisMonth
   const lentOutstandingThisMonth = lendBorrowMonth.lentOutstandingThisMonth
 
   const unconfirmedSavingsThisMonth = Math.max(0, plannedSavings - confirmedSavedInvested)
   const stillInBank = hasSalaryThisMonth ? unconfirmedSavingsThisMonth : 0
 
-  const availableBalance = Math.max(0, adjustedSafeToSpend) + carriedForwardBalance
+  const availableBalance = Math.max(0, adjustedSafeToSpend + carriedForwardBalance)
   const { foundMoneyTotal, accounts: moneyAccounts } = useAccountsStore()
-  const yourMoney = availableBalance + stillInBank + foundMoneyTotal
-  const monthRemainingBalance = Math.max(0, adjustedSafeToSpend)
+  const yourMoney = Math.max(
+    0,
+    adjustedSafeToSpend + carriedForwardBalance + stillInBank + foundMoneyTotal,
+  )
+  const monthRemainingBalance = adjustedSafeToSpend
 
   const daysRemaining = getDaysRemaining(monthStartDay)
   const weeksRemaining = Math.max(1, daysRemaining / 7)
@@ -223,6 +229,7 @@ export function usePulseData() {
     totalAllocations,
     savingsSetAside: plannedSavings,
     flaggedAmount,
+    feesThisMonth,
     unconfirmedSavings,
     stillToSave,
     stillToInvest,

@@ -28,7 +28,7 @@ Monthly take-home (playbook)
 
 **Buckets** — monthly amounts, types (`spending` | `savings` | `investment`). Regular spending resets each month. **Personal** accumulates with top-up + cap.
 
-**Transactions** — amount, date, bucket, **title** (user label), optional description, remarks, source, optional flag.
+**Transactions** — amount, optional fee, date, bucket, **title** (user label), optional description, remarks, source, optional flag. Fees leave cash but do not count toward the bucket or investment principal.
 
 **Goals** — targets with linked savings bucket(s); can complete and archive.
 
@@ -45,9 +45,9 @@ Monthly take-home (playbook)
 3. Home and Ledger update
 
 ### 2. Month rhythm
-- **Month Start Checklist:** confirm salary (unlocks safe to spend) + savings/investment transfers
+- **Month Start Checklist:** auto-opens once per playbook month; confirm salary (unlocks safe to spend) + savings/investment transfers
 - **Future section** (bottom of Home): monthly check-off for EF, goals, SIP, Shares via `__savings_confirm__`; each row shows balance vs target and % progress — EF is here, not a separate card above the ring
-- **Month rollover:** Personal top-up + cap; surplus → carried-forward; cap override reset
+- **Month rollover:** Personal top-up + cap; signed leftover adds to or consumes carried-forward (floor 0); cap override reset
 
 ### 3. Safe to spend vs available balance
 
@@ -98,6 +98,8 @@ Separate from buckets and the transaction ledger's income/expense flow:
 - **Lend** — cash left you; reduces safe-to-spend for the month; purple ring slice
 - **Borrow** — cash received; temporarily increases available balance
 - **Settle** — partial or full repayment; not income or expense
+- Entries and people can be edited/deleted; deleting a person removes their lending history
+- Paying a settlement leaves Your money; receiving one adds to it, without touching Living buckets
 - Per-person net balance; home row shows total net across all people
 
 ### Payment helper (Android)

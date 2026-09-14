@@ -20,7 +20,8 @@ import { LendingRow } from '@/components/transactions/LendingRow'
 import { ChartsView } from '@/components/transactions/ChartsView'
 import type { Transaction } from '@/store/transactions'
 import { useLendingStore } from '@/store/lending'
-import { router } from 'expo-router'
+import { LendingEntrySheet } from '@/components/lending/LendingEntrySheet'
+import type { LendBorrowEntry } from '@/store/lending'
 
 type FilterKey = 'all' | 'income' | 'flagged' | 'lending' | string
 
@@ -28,13 +29,21 @@ export default function TransactionsScreen() {
   const insets = useSafeAreaInsets()
   const { transactions } = useTransactionsStore()
   const { buckets, getSpendingBuckets, getSavingsBuckets } = useBucketsStore()
-  const { entries: lendingEntries, contacts, allEntries } = useLendingStore()
+  const {
+    entries: lendingEntries,
+    contacts,
+    allEntries,
+    updateEntry,
+    deleteEntry,
+  } = useLendingStore()
 
   const [viewMode, setViewMode] = useState<'list' | 'chart'>('list')
   const [chartPeriod, setChartPeriod] = useState<'month' | 'year'>('month')
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   const [detailVisible, setDetailVisible] = useState(false)
+  const [selectedLendingEntry, setSelectedLendingEntry] =
+    useState<LendBorrowEntry | null>(null)
 
   const bucketMap = useMemo(() => {
     const m = new Map<string, { name: string; color: string }>()
@@ -116,7 +125,15 @@ export default function TransactionsScreen() {
     [transactions],
   )
   const totalSpent = useMemo(
-    () => transactions.filter(t => t.type === 'expense' && !t.isFlagged && !t.isRecurringDraft).reduce((s, t) => s + t.amount, 0),
+    () => transactions
+      .filter(t => t.type === 'expense' && !t.isFlagged && !t.isRecurringDraft)
+      .reduce((s, t) => s + t.amount + t.feeAmount, 0),
+    [transactions],
+  )
+  const currentFees = useMemo(
+    () => transactions
+      .filter(t => t.type === 'expense' && !t.isFlagged && !t.isRecurringDraft)
+      .reduce((s, t) => s + t.feeAmount, 0),
     [transactions],
   )
   const net = totalIncome - totalSpent
@@ -282,7 +299,7 @@ export default function TransactionsScreen() {
             <LendingRow
               entry={item}
               personName={contactMap.get(item.contactId) ?? 'Unknown'}
-              onPress={() => router.push(`/lending/${item.contactId}`)}
+              onPress={() => setSelectedLendingEntry(item)}
             />
           )}
           ListEmptyComponent={
@@ -338,6 +355,7 @@ export default function TransactionsScreen() {
             spendingByBucket={spendingByBucket}
             savingsByBucket={savingsInfo}
             goals={goalsInfo}
+            currentFees={currentFees}
             period={chartPeriod}
           />
         </ScrollView>
@@ -348,6 +366,18 @@ export default function TransactionsScreen() {
         transaction={selectedTxn}
         visible={detailVisible}
         onClose={closeDetail}
+      />
+      <LendingEntrySheet
+        visible={selectedLendingEntry !== null}
+        entry={selectedLendingEntry}
+        personName={
+          selectedLendingEntry
+            ? contactMap.get(selectedLendingEntry.contactId) ?? 'Unknown'
+            : ''
+        }
+        onSave={updateEntry}
+        onDelete={deleteEntry}
+        onClose={() => setSelectedLendingEntry(null)}
       />
     </View>
   )

@@ -10,6 +10,7 @@ export const playbook = sqliteTable('playbook', {
   efStartBalance: real('ef_start_balance').notNull().default(0),
   isOnboarded: integer('is_onboarded', { mode: 'boolean' }).notNull().default(false),
   lastChecklistMonth: text('last_checklist_month'), // format YYYY-MM
+  lastChecklistPromptMonth: text('last_checklist_prompt_month'), // format YYYY-MM
   lastBalanceRolloverMonth: text('last_balance_rollover_month'), // format YYYY-MM
   userAge: integer('user_age'),
   carriedForwardBalance: real('carried_forward_balance').default(0),
@@ -61,6 +62,7 @@ export const transactions = sqliteTable('transactions', {
   id: text('id').primaryKey(),
   type: text('type', { enum: ['expense', 'income'] }).notNull().default('expense'),
   amount: real('amount').notNull(),
+  feeAmount: real('fee_amount').notNull().default(0),
   merchant: text('merchant'),
   description: text('description'),
   bucketId: text('bucket_id').notNull(),

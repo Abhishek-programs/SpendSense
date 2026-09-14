@@ -85,6 +85,13 @@
       "when": 1776287843289,
       "tag": "0011_money_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789354800000,
+      "tag": "0012_transaction_fees_checklist_prompt",
+      "breakpoints": true
     }
   ]
 }

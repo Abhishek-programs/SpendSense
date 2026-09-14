@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
-import { formatNPR, formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/format'
 import { transactionTitle } from '@/lib/transaction-label'
 import { useBucketsStore } from '@/store/buckets'
 import { useTransactionsStore } from '@/store/transactions'
@@ -35,6 +35,9 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
   const allBuckets = [...getSpendingBuckets(), ...getSavingsBuckets()]
 
   const [selectedBucketId, setSelectedBucketId] = useState<string>('')
+  const [amount, setAmount] = useState('')
+  const [feeAmount, setFeeAmount] = useState('')
+  const [showFee, setShowFee] = useState(false)
   const [description, setDescription] = useState('')
   const [merchant, setMerchant] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -44,6 +47,9 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
   useEffect(() => {
     if (transaction && visible) {
       setSelectedBucketId(transaction.bucketId)
+      setAmount(String(transaction.amount))
+      setFeeAmount(transaction.feeAmount > 0 ? String(transaction.feeAmount) : '')
+      setShowFee(transaction.feeAmount > 0)
       setDescription(transaction.description ?? '')
       setMerchant(transaction.merchant ?? '')
       setRemarks(transaction.remarks ?? '')
@@ -69,7 +75,12 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
     if (saving) return
     setSaving(true)
     try {
+      const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0
+      const parsedFee = parseFloat(feeAmount.replace(/,/g, '')) || 0
+      if (parsedAmount <= 0) return
       const patch: Partial<Transaction> = {
+        amount: parsedAmount,
+        feeAmount: isExpense ? Math.max(0, parsedFee) : 0,
         description: description.trim() || null,
         merchant: merchant.trim() || null,
       }
@@ -143,9 +154,40 @@ export function TransactionDetailSheet({ transaction, visible, onClose }: Transa
           >
             {/* Amount */}
             <View style={styles.amountContainer}>
-              <Text style={[styles.amount, { color: isIncome ? colors.green : colors.red }]}>
-                NPR {formatNPR(transaction.amount)}
-              </Text>
+              <View style={styles.amountEditRow}>
+                <Text style={[styles.amountPrefix, { color: isIncome ? colors.green : colors.red }]}>
+                  NPR
+                </Text>
+                <TextInput
+                  style={[styles.amountInput, { color: isIncome ? colors.green : colors.red }]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                />
+                {isExpense && (
+                  <TouchableOpacity
+                    style={[styles.feeChip, showFee && styles.feeChipActive]}
+                    onPress={() => setShowFee(v => !v)}
+                  >
+                    <Text style={[styles.feeChipText, showFee && styles.feeChipTextActive]}>
+                      + Fee
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {isExpense && showFee && (
+                <View style={styles.feeInputRow}>
+                  <Text style={styles.feeLabel}>Fee NPR</Text>
+                  <TextInput
+                    style={styles.feeInput}
+                    value={feeAmount}
+                    onChangeText={setFeeAmount}
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              )}
               <View style={[styles.typeBadge, { backgroundColor: isIncome ? colors.greenFill : '#FEE2E2' }]}>
                 <Text style={[styles.typeBadgeText, { color: isIncome ? colors.green : colors.red }]}>
                   {isIncome ? 'Income' : 'Expense'}
@@ -319,10 +361,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 20,
   },
-  amount: {
+  amountEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  amountPrefix: {
+    fontSize: 20,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  amountInput: {
+    minWidth: 100,
     fontSize: 36,
     fontFamily: 'Inter_700Bold',
     fontVariant: ['tabular-nums'],
+    padding: 0,
+    textAlign: 'center',
+  },
+  feeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  feeChipActive: {
+    borderColor: colors.amber,
+    backgroundColor: colors.amberFill,
+  },
+  feeChipText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textMuted,
+  },
+  feeChipTextActive: {
+    color: colors.amber,
+  },
+  feeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  feeLabel: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
+  },
+  feeInput: {
+    minWidth: 70,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.amber,
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
+    textAlign: 'right',
   },
   typeBadge: {
     paddingHorizontal: 12,

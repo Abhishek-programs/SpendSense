@@ -18,6 +18,7 @@ interface ChartsViewProps {
   spendingByBucket: BucketSpend[]
   savingsByBucket?: { label: string; value: number; target: number; color: string; confirmed: boolean }[]
   goals?: { name: string; current: number; target: number; projectedDate?: string }[]
+  currentFees?: number
   period: 'month' | 'year'
 }
 
@@ -33,6 +34,7 @@ export function ChartsView({
   spendingByBucket,
   savingsByBucket = [],
   goals = [],
+  currentFees = 0,
   period,
 }: ChartsViewProps) {
   const [trendData, setTrendData] = useState<MonthlySpend[]>([])
@@ -46,9 +48,14 @@ export function ChartsView({
       .finally(() => setLoading(false))
   }, [period])
 
-  const hasData = spendingByBucket.length > 0 || savingsByBucket.length > 0
+  const hasData =
+    spendingByBucket.length > 0 || savingsByBucket.length > 0 || currentFees > 0
   const hasTrendData = trendData.some(m => m.total > 0)
   const monthsWithData = trendData.filter(m => m.total > 0).length
+  const fees =
+    period === 'year'
+      ? trendData.reduce((sum, month) => sum + month.fees, 0)
+      : currentFees
 
   // Empty states
   if (!hasData && !hasTrendData) {
@@ -84,6 +91,21 @@ export function ChartsView({
 
   return (
     <View style={styles.container}>
+      {fees > 0 && (
+        <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
+          <Text style={styles.title}>Fees</Text>
+          <View style={styles.feeCard}>
+            <View>
+              <Text style={styles.feeLabel}>
+                {period === 'year' ? 'Paid in the last 12 months' : 'Paid this month'}
+              </Text>
+              <Text style={styles.feeHint}>Excluded from buckets and investments</Text>
+            </View>
+            <Text style={styles.feeValue}>NPR {formatNPRShort(fees)}</Text>
+          </View>
+        </Animated.View>
+      )}
+
       {/* Spending by Bucket */}
       {spendingByBucket.length > 0 && (
         <Animated.View style={styles.section} entering={FadeIn.duration(300)}>
@@ -251,6 +273,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 20,
     borderCurve: 'continuous',
+  },
+  feeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+  },
+  feeLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
+  },
+  feeHint: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 3,
+  },
+  feeValue: {
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+    color: colors.amber,
+    fontVariant: ['tabular-nums'],
   },
   trendCard: {
     paddingTop: 28,

@@ -132,6 +132,9 @@ export function applySchemaPatches() {
   if (playbookTable && !hasColumn('playbook', 'last_balance_rollover_month')) {
     sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_balance_rollover_month\` text`)
   }
+  if (playbookTable && !hasColumn('playbook', 'last_checklist_prompt_month')) {
+    sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`last_checklist_prompt_month\` text`)
+  }
   if (playbookTable && !hasColumn('playbook', 'user_age')) {
     sqlite.execSync(`ALTER TABLE \`playbook\` ADD COLUMN \`user_age\` integer`)
   }
@@ -206,6 +209,9 @@ export function applySchemaPatches() {
   }
   if (transactionsExists && !hasColumn('transactions', 'account_id')) {
     sqlite.execSync(`ALTER TABLE \`transactions\` ADD COLUMN \`account_id\` text`)
+  }
+  if (transactionsExists && !hasColumn('transactions', 'fee_amount')) {
+    sqlite.execSync(`ALTER TABLE \`transactions\` ADD COLUMN \`fee_amount\` real DEFAULT 0 NOT NULL`)
   }
 
   const accountsTable = sqlite.getFirstSync(

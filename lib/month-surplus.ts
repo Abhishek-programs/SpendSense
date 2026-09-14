@@ -1,11 +1,12 @@
 import { and, gte, lte } from 'drizzle-orm'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { buckets, playbook, transactions } from '@/db/schema'
+import { buckets, lendBorrowEntries, playbook, transactions } from '@/db/schema'
 import { currentMonthKey } from '@/lib/bucket-balance'
 import { getMonthRange } from '@/lib/month'
 import type { Bucket } from '@/store/buckets'
 import type { Transaction } from '@/store/transactions'
+import { computeMonthMetrics, type LendBorrowEntry } from '@/lib/lending/balance'
 
 function getPreviousMonthRange(monthStartDay: number): { start: Date; end: Date } {
   const { start: currentStart } = getMonthRange(monthStartDay)
@@ -26,6 +27,7 @@ export function computeMonthSurplus(
   monthlyIncome: number,
   activeBuckets: Bucket[],
   transactions: Transaction[],
+  lendingCashAdjust = 0,
 ): number {
   const totalAllocations = activeBuckets.reduce((s, b) => s + b.monthlyAmount, 0)
 
@@ -41,10 +43,11 @@ export function computeMonthSurplus(
       transactions
         .filter(
           t =>
-            t.bucketId === b.id &&
             t.type === 'expense' &&
             !t.isFlagged &&
-            !t.isRecurringDraft,
+            !t.isRecurringDraft &&
+            (t.bucketId === b.id ||
+              (t.fundedFromBucketId === b.id && t.remarks === '__savings_confirm__')),
         )
         .reduce((sum, t) => sum + t.amount, 0)
     )
@@ -56,20 +59,50 @@ export function computeMonthSurplus(
       transactions
         .filter(
           t =>
-            t.bucketId === b.id &&
             t.type === 'expense' &&
             !t.isFlagged &&
             !t.isRecurringDraft &&
-            (!t.remarks || !t.remarks.startsWith('__')),
+            ((t.bucketId === b.id && (!t.remarks || !t.remarks.startsWith('__'))) ||
+              (t.fundedFromBucketId === b.id && t.remarks === '__savings_confirm__')),
         )
         .reduce((sum, t) => sum + t.amount, 0)
     )
   }, 0)
 
-  const unallocated = Math.max(0, monthlyIncome - totalAllocations)
-  const safeToSpend = spendingPlan - lifestyleSpent - personalDraws + unallocated
+  const salaryTransactions = transactions.filter(
+    t =>
+      t.type === 'income' &&
+      t.remarks === '__salary__' &&
+      !t.isRecurringDraft,
+  )
+  const hasSalary = salaryTransactions.length > 0
+  const effectiveIncome = salaryTransactions.reduce((sum, t) => sum + t.amount, 0)
+  const unallocated = Math.max(
+    0,
+    (effectiveIncome || monthlyIncome) - totalAllocations,
+  )
+  const fees = transactions
+    .filter(t => t.type === 'expense' && !t.isFlagged && !t.isRecurringDraft)
+    .reduce((sum, t) => sum + t.feeAmount, 0)
+  const plannedSavings = activeBuckets
+    .filter(b => b.type === 'savings' || b.type === 'investment')
+    .reduce((sum, b) => sum + b.monthlyAmount, 0)
+  const confirmedSavings = transactions
+    .filter(
+      t =>
+        t.type === 'expense' &&
+        t.remarks === '__savings_confirm__' &&
+        !t.isFlagged &&
+        !t.isRecurringDraft,
+    )
+    .reduce((sum, t) => sum + t.amount, 0)
+  const stillInBank = hasSalary ? Math.max(0, plannedSavings - confirmedSavings) : 0
+  const plannedLeftover = hasSalary
+    ? spendingPlan - lifestyleSpent - personalDraws + unallocated
+    : 0
+  const monthLeftover = plannedLeftover + stillInBank + lendingCashAdjust - fees
 
-  return Math.max(0, safeToSpend)
+  return monthLeftover
 }
 
 export async function runSurplusRollover(
@@ -108,14 +141,27 @@ export async function runSurplusRollover(
 
   const mappedTxns: Transaction[] = prevTxns.map(t => ({
     ...t,
+    feeAmount: t.feeAmount ?? 0,
     merchant: t.merchant ?? null,
     remarks: t.remarks ?? null,
     parsedTxnId: t.parsedTxnId ?? null,
   }))
 
-  const surplus = computeMonthSurplus(pb.monthlyIncome, activeBuckets, mappedTxns)
+  const lendingRows = await db.select().from(lendBorrowEntries)
+  const mappedLending: LendBorrowEntry[] = lendingRows.map(e => ({
+    ...e,
+    type: e.type as LendBorrowEntry['type'],
+    note: e.note ?? null,
+  }))
+  const lendingCashAdjust = computeMonthMetrics(mappedLending, start, end).lendBorrowCashAdjust
+  const surplus = computeMonthSurplus(
+    pb.monthlyIncome,
+    activeBuckets,
+    mappedTxns,
+    lendingCashAdjust,
+  )
 
-  const newCarry = (pb.carriedForwardBalance ?? 0) + surplus
+  const newCarry = Math.max(0, (pb.carriedForwardBalance ?? 0) + surplus)
   await db
     .update(playbook)
     .set({

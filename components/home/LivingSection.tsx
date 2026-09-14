@@ -1,6 +1,4 @@
-import { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, StyleSheet } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import {
   CORE_LIVING_BUCKET_ID,
@@ -12,9 +10,7 @@ import {
 import { colors } from '@/constants/colors'
 import { formatNPR } from '@/lib/format'
 import { effectiveCap } from '@/lib/bucket-balance'
-import { livingOvershoot, totalLivingOvershoot } from '@/lib/living-reallocate'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { LivingReallocateSheet } from '@/components/home/LivingReallocateSheet'
 import type { Bucket } from '@/store/buckets'
 
 const BUCKET_HINTS: Record<string, string> = {
@@ -38,15 +34,13 @@ export function LivingSection({
   bucketBalances,
   personalRecoveryDebt = 0,
 }: LivingSectionProps) {
-  const [reallocateOpen, setReallocateOpen] = useState(false)
   const regularBuckets = buckets.filter(b => !b.accumulates)
   const fundBuckets = buckets.filter(b => b.accumulates)
-  const overTotal = totalLivingOvershoot(regularBuckets, spentByBucket)
 
   const renderRegularRow = (bucket: Bucket, i: number) => {
     const spent = spentByBucket[bucket.id] ?? 0
     const ceiling = bucket.monthlyAmount
-    const over = livingOvershoot(bucket, spent)
+    const over = Math.max(0, spent - ceiling)
     let segments: { green: number; red: number; darkRed?: number }
     if (over > 0 && spent > 0) {
       segments = {
@@ -144,16 +138,6 @@ export function LivingSection({
           <Text style={styles.title}>Living</Text>
           <Text style={styles.subtitle}>Ceilings & personal fund</Text>
         </View>
-        {overTotal > 0 && (
-          <TouchableOpacity
-            onPress={() => setReallocateOpen(true)}
-            hitSlop={10}
-            style={styles.reallocateBtn}
-            accessibilityLabel="Reallocate living ceilings"
-          >
-            <Ionicons name="git-compare-outline" size={20} color={colors.amber} />
-          </TouchableOpacity>
-        )}
       </View>
       <View style={styles.card}>
         {regularBuckets.map((bucket, i) => renderRegularRow(bucket, i))}
@@ -168,13 +152,6 @@ export function LivingSection({
           <Text style={styles.empty}>No spending buckets</Text>
         )}
       </View>
-
-      <LivingReallocateSheet
-        visible={reallocateOpen}
-        onClose={() => setReallocateOpen(false)}
-        regularBuckets={regularBuckets}
-        spentByBucket={spentByBucket}
-      />
     </Animated.View>
   )
 }
@@ -187,15 +164,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'flex-start',
-  },
-  reallocateBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.amberFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
   },
   title: {
     fontSize: 18,

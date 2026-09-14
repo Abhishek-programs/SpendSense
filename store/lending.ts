@@ -36,8 +36,12 @@ interface LendingState {
     note?: string | null
     date: string
   }) => Promise<void>
+  updateEntry: (
+    id: string,
+    patch: Partial<Pick<LendBorrowEntry, 'type' | 'amount' | 'note' | 'date'>>,
+  ) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
-  deleteContact: (id: string) => Promise<{ ok: boolean; error?: string }>
+  deleteContact: (id: string) => Promise<void>
   getPersonBalance: (contactId: string) => number
   getTotalNetBalance: () => number
   getLentOutTotal: () => number
@@ -127,6 +131,36 @@ export const useLendingStore = create<LendingState>((set, get) => ({
     }
   },
 
+  updateEntry: async (id, patch) => {
+    const existing = get().allEntries.find(e => e.id === id)
+    if (!existing) return
+    const next = { ...existing, ...patch }
+    if (next.amount <= 0) throw new Error('Amount must be positive')
+    if (next.type === 'settle') {
+      const balanceWithoutEntry = computePersonBalance(
+        next.contactId,
+        get().allEntries.filter(e => e.id !== id),
+      )
+      if (balanceWithoutEntry === 0) throw new Error('Nothing to settle')
+      if (next.amount > Math.abs(balanceWithoutEntry)) {
+        throw new Error('Amount exceeds balance')
+      }
+    }
+    await db
+      .update(lendBorrowEntries)
+      .set({
+        type: next.type,
+        amount: next.amount,
+        note: next.note?.trim() || null,
+        date: next.date,
+      })
+      .where(eq(lendBorrowEntries.id, id))
+    await get().loadAllEntries()
+    if (cachedMonthRange) {
+      await get().loadEntries(cachedMonthRange.start, cachedMonthRange.end)
+    }
+  },
+
   deleteEntry: async (id: string) => {
     await db.delete(lendBorrowEntries).where(eq(lendBorrowEntries.id, id))
     await get().loadAllEntries()
@@ -136,13 +170,13 @@ export const useLendingStore = create<LendingState>((set, get) => ({
   },
 
   deleteContact: async (id: string) => {
-    const hasEntries = get().allEntries.some(e => e.contactId === id)
-    if (hasEntries) {
-      return { ok: false, error: 'Remove all transactions with this person first' }
-    }
+    await db.delete(lendBorrowEntries).where(eq(lendBorrowEntries.contactId, id))
     await db.delete(contacts).where(eq(contacts.id, id))
+    await get().loadAllEntries()
+    if (cachedMonthRange) {
+      await get().loadEntries(cachedMonthRange.start, cachedMonthRange.end)
+    }
     set({ contacts: get().contacts.filter(c => c.id !== id) })
-    return { ok: true }
   },
 
   getPersonBalance: (contactId: string) =>

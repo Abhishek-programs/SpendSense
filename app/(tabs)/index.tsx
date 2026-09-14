@@ -58,6 +58,7 @@ export default function HomeScreen() {
     monthStartDay,
     monthlyIncome,
     lastChecklistMonth,
+    lastChecklistPromptMonth,
     efFloor,
     personalRecoveryDebt,
     updatePlaybook,
@@ -108,10 +109,10 @@ export default function HomeScreen() {
   const [checklistVisible, setChecklistVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [shareBucketId, setShareBucketId] = useState<string | null>(null);
+  const [shareConfirmAmount, setShareConfirmAmount] = useState<number | null>(
+    null,
+  );
   const [capPromptVisible, setCapPromptVisible] = useState(false);
-  const [capPromptMode, setCapPromptMode] = useState<
-    "cap_hit" | "idle_rebalance"
-  >("cap_hit");
 
   const flagged = transactions.filter((t) => t.isFlagged);
 
@@ -122,6 +123,28 @@ export default function HomeScreen() {
   const hasSalaryThisMonth = transactions.some(
     (t) => t.remarks === "__salary__" && t.type === "income",
   );
+  const sipBucket = savingsBuckets.find((b) => b.id === SIP_BUCKET_ID);
+  const sipConfirmedPrincipal = transactions
+    .filter(
+      (t) =>
+        t.bucketId === SIP_BUCKET_ID &&
+        t.type === "expense" &&
+        t.remarks === "__savings_confirm__" &&
+        !t.isFlagged &&
+        !t.isRecurringDraft,
+    )
+    .reduce((sum, t) => sum + t.amount, 0);
+  const sipRemaining = Math.max(
+    0,
+    (sipBucket?.monthlyAmount ?? 0) - sipConfirmedPrincipal,
+  );
+  const sipChunks = useMemo(() => {
+    const chunks: number[] = [];
+    for (let remaining = sipRemaining; remaining > 0; remaining -= 5000) {
+      chunks.push(Math.min(5000, remaining));
+    }
+    return chunks;
+  }, [sipRemaining]);
 
   const checklistItems: ChecklistItem[] = useMemo(() => {
     const items: ChecklistItem[] = [
@@ -140,6 +163,7 @@ export default function HomeScreen() {
         amount: b.monthlyAmount,
         bucketId: b.id,
         completed: confirmedSavingIds.has(b.id),
+        chunks: b.id === SIP_BUCKET_ID ? sipChunks : undefined,
       });
     });
     return items;
@@ -149,16 +173,23 @@ export default function HomeScreen() {
     hasSalaryThisMonth,
     confirmedSavingIds,
     goals,
+    sipChunks,
   ]);
 
   const checklistAllDone = checklistItems.every((i) => i.completed);
   const checklistPending = lastChecklistMonth !== monthKey && !checklistAllDone;
 
   useEffect(() => {
-    if (lastChecklistMonth !== monthKey && !checklistAllDone) {
+    if (lastChecklistPromptMonth !== monthKey && !checklistAllDone) {
       setChecklistVisible(true);
+      void updatePlaybook({ lastChecklistPromptMonth: monthKey });
     }
-  }, [lastChecklistMonth, monthKey]);
+  }, [
+    lastChecklistPromptMonth,
+    monthKey,
+    checklistAllDone,
+    updatePlaybook,
+  ]);
 
   useEffect(() => {
     if (checklistAllDone && lastChecklistMonth !== monthKey) {
@@ -187,6 +218,10 @@ export default function HomeScreen() {
     } else {
       const bucket = savingsBuckets.find((b) => b.id === id);
       if (!bucket) return;
+      if (bucket.id === SIP_BUCKET_ID) {
+        handleConfirmSavings(bucket.id);
+        return;
+      }
       await addTransaction({
         type: "expense",
         amount: bucket.monthlyAmount,
@@ -216,6 +251,11 @@ export default function HomeScreen() {
 
     if (isEditable) {
       setShareBucketId(bucketId);
+      setShareConfirmAmount(
+        bucket.id === SIP_BUCKET_ID
+          ? Math.min(5000, sipRemaining)
+          : bucket.monthlyAmount,
+      );
       setShareSheetVisible(true);
       return;
     }
@@ -236,13 +276,14 @@ export default function HomeScreen() {
     });
   };
 
-  const handleShareConfirm = async (amount: number) => {
+  const handleShareConfirm = async (amount: number, feeAmount: number) => {
     if (!shareBucketId) return;
     const bucket = savingsBuckets.find((b) => b.id === shareBucketId);
     if (!bucket) return;
     await addTransaction({
       type: "expense",
       amount,
+      feeAmount,
       description: bucket.name,
       merchant: bucket.name,
       bucketId: bucket.id,
@@ -255,6 +296,7 @@ export default function HomeScreen() {
       isRecurringDraft: false,
     });
     setShareBucketId(null);
+    setShareConfirmAmount(null);
   };
 
   const shareBucket = shareBucketId
@@ -315,7 +357,6 @@ export default function HomeScreen() {
     if (!personalBucket) return;
     isPersonalAtCap(personalBucket).then((atCap) => {
       if (atCap && !personalBucket.capOverride) {
-        setCapPromptMode("cap_hit");
         setCapPromptVisible(true);
       }
     });
@@ -504,6 +545,7 @@ export default function HomeScreen() {
           standaloneBuckets={standaloneBuckets}
           confirmedBucketIds={confirmedSavingIds}
           progressByBucket={progressByBucket}
+          chunksByBucket={{ [SIP_BUCKET_ID]: sipChunks }}
           efBucketId={EF_BUCKET_ID}
           showPlaceholder={!hasBigSpendGoal}
           onConfirm={handleConfirmSavings}
@@ -522,11 +564,16 @@ export default function HomeScreen() {
       <ShareConfirmSheet
         visible={shareSheetVisible}
         bucketName={shareBucket?.name ?? "Direct Shares"}
-        defaultAmount={shareBucket?.monthlyAmount ?? 0}
+        amountEditable={shareBucket?.id !== SIP_BUCKET_ID}
+        showFeeByDefault={shareBucket?.id === SIP_BUCKET_ID}
+        defaultAmount={
+          shareConfirmAmount ?? shareBucket?.monthlyAmount ?? 0
+        }
         onConfirm={handleShareConfirm}
         onClose={() => {
           setShareSheetVisible(false);
           setShareBucketId(null);
+          setShareConfirmAmount(null);
         }}
       />
 
@@ -543,12 +590,7 @@ export default function HomeScreen() {
           visible={capPromptVisible}
           balance={personalBalance}
           defaultCap={personalBucket.accumulationCap ?? 20000}
-          mode={capPromptMode}
           onClose={() => setCapPromptVisible(false)}
-          onRebalance={() => {
-            setCapPromptVisible(false);
-            router.push("/(tabs)/goals");
-          }}
         />
       )}
     </View>

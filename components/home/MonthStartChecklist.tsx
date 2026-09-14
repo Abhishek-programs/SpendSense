@@ -10,6 +10,7 @@ export interface ChecklistItem {
   amount: number
   bucketId: string
   completed: boolean
+  chunks?: number[]
 }
 
 interface MonthStartChecklistProps {
@@ -79,9 +80,19 @@ export function MonthStartChecklist({
                     <Text style={[styles.itemLabel, item.completed && styles.itemLabelCompleted]}>
                       {item.label}
                     </Text>
-                    <Text style={[styles.itemAmount, item.completed && styles.itemAmountCompleted]}>
-                      NPR {formatNPRShort(item.amount)}
-                    </Text>
+                    {item.chunks && item.chunks.length > 0 && !item.completed ? (
+                      <View style={styles.chunks}>
+                        {item.chunks.map((chunk, index) => (
+                          <Text key={`${chunk}-${index}`} style={styles.chunk}>
+                            +{formatNPRShort(chunk)}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={[styles.itemAmount, item.completed && styles.itemAmountCompleted]}>
+                        NPR {formatNPRShort(item.amount)}
+                      </Text>
+                    )}
                   </View>
                   {item.completed && (
                     <Animated.View entering={FadeIn.duration(300)}>
@@ -225,6 +236,21 @@ const styles = StyleSheet.create({
   },
   itemAmountCompleted: {
     color: colors.textMuted,
+  },
+  chunks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  chunk: {
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    color: colors.green,
+    backgroundColor: colors.greenFill,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
   },
   footer: {
     paddingHorizontal: 24,
