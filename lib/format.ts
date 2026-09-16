@@ -1,3 +1,8 @@
+/** NPR paisa — two decimal places. */
+export function roundPaisa(amount: number): number {
+  return Math.round(amount * 100) / 100
+}
+
 // Formats amount in Indian lakh notation: 150000 → "1,50,000"
 // Keeps up to 3 decimals when present (150.5 → "150.5", 150.125 → "150.125"); omits .00
 export function formatNPR(amount: number): string {

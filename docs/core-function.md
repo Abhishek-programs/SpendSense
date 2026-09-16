@@ -37,7 +37,7 @@ Monthly take-home (playbook)
 ## Core loops
 
 ### 1. Capture → categorize → inform
-1. Log via **Manual Entry** (center FAB), or optional **payment helper** notification (eSewa / nBank; amount only, flagged until you assign a bucket)
+1. Log via **Manual Entry** (center FAB), or optional **payment helper** notification in selected Android apps (eSewa / nBank by default; amount is flagged until you assign a bucket)
 2. **Categorization** (priority):
    - Keyword word match in description / remarks / merchant
    - Sure-shot merchant (Settings)
@@ -46,14 +46,15 @@ Monthly take-home (playbook)
 
 ### 2. Month rhythm
 - **Month Start Checklist:** auto-opens once per playbook month; confirm salary (unlocks safe to spend) + savings/investment transfers
+- **Early salary:** during the 7 days before the configured start, **Paid early?** snapshots **Your money** on the card as carry, adds back today's spend (and drops today's borrow/income) so those stay in the new period only, then logs salary. After the tap, cash is that carry + salary − this period’s flow. The configured start day remains the next regular boundary.
 - **Future section** (bottom of Home): monthly check-off for EF, goals, SIP, Shares via `__savings_confirm__`; each row shows balance vs target and % progress — EF is here, not a separate card above the ring
-- **Month rollover:** Personal top-up + cap; signed leftover adds to or consumes carried-forward (floor 0); cap override reset
+- **Month rollover:** Personal top-up + cap; carried-forward becomes that period’s cash on hand (floor 0); cap override reset
 
 ### 3. Safe to spend vs available balance
 
 | Concept | Meaning |
 |---------|---------|
-| **Your money** (collapsed) | Cash on you right now: remaining this month + carried-forward + planned Future not yet confirmed. Confirming a save moves that amount to net worth. |
+| **Your money** (collapsed) | Bank leftover pile (carry + this period’s bank flow) plus eSewa and Cash. Cash is its own wallet — it is not subtracted from Bank. Confirming a save moves that amount to net worth. |
 | **Safe to spend** (ring) | Lifestyle budgets remaining + unallocated income, after salary confirmed. Excludes carry-forward and unconfirmed Future. |
 | **Net worth** (Your money, expanded) | Confirmed EF + goals + SIP + shares only |
 
@@ -104,7 +105,7 @@ Separate from buckets and the transaction ledger's income/expense flow:
 
 ### Payment helper (Android)
 
-Optional Settings toggle. Usage access (`UsageStatsManager`) plus a reply notification while eSewa or nBank is in the foreground. Amount-only expense is saved flagged (`source: notification`). No screenshot, overlay, or Accessibility.
+Settings → **Notif.** controls the watched apps, 0–60 second prompt delay (5 seconds by default), and reliable persistent vs best-effort background mode. Usage access (`UsageStatsManager`) detects the foreground app. Amount and Living bucket are entered in the notification shade; the payment app remains visible. The amount-only expense is initially flagged (`source: notification`) and bucket assignment clears the flag. No screenshot, overlay, or Accessibility.
 
 ### Scan bubble (removed)
 

@@ -5,6 +5,7 @@ export const playbook = sqliteTable('playbook', {
   userName: text('user_name'),
   monthlyIncome: real('monthly_income').notNull().default(125000),
   monthStartDay: integer('month_start_day').notNull().default(1),
+  earlyMonthStartDate: text('early_month_start_date'), // local YYYY-MM-DD
   fallbackBucketId: text('fallback_bucket_id'),
   efFloor: real('ef_floor').notNull().default(150000),
   efStartBalance: real('ef_start_balance').notNull().default(0),
@@ -25,6 +26,7 @@ export const buckets = sqliteTable('buckets', {
   name: text('name').notNull(),
   type: text('type', { enum: ['spending', 'savings', 'investment'] }).notNull(),
   monthlyAmount: real('monthly_amount').notNull(),
+  lastMonthlyAmount: real('last_monthly_amount'),
   color: text('color').notNull().default('#16A34A'),
   icon: text('icon').notNull().default('💰'),
   sortOrder: integer('sort_order').notNull().default(0),

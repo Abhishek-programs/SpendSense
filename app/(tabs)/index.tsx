@@ -35,11 +35,26 @@ import {
   EF_BUCKET_ID,
   PERSONAL_BUCKET_ID,
 } from "@/constants/defaults";
-import { currentMonthKey, effectiveCap } from "@/lib/bucket-balance";
+import {
+  currentMonthKey,
+  effectiveCap,
+  runMonthRollover,
+} from "@/lib/bucket-balance";
 import { isPersonalAtCap } from "@/lib/personal-cap";
 import { checkAndCompleteGoals } from "@/lib/goals/completion";
 import { PersonalCapPrompt } from "@/components/home/PersonalCapPrompt";
 import { LentBorrowRow } from "@/components/home/LentBorrowRow";
+import { useLendingStore } from "@/store/lending";
+import {
+  getDaysUntilNextRegularStart,
+  getMonthRange,
+  toLocalDateKey,
+} from "@/lib/month";
+import { runSurplusRollover } from "@/lib/month-surplus";
+import { computeMonthMetrics } from "@/lib/lending/balance";
+import { movedIntoNewPeriodAdjust } from "@/lib/your-money";
+import { formatNPR } from "@/lib/format";
+import { applySchemaPatches, restoreWipedSpendingCeilings } from "@/db/client";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -50,24 +65,31 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { transactions, deleteTransaction } = useTransactionsStore();
-  const { buckets } = useBucketsStore();
+  const { transactions, allTransactions, deleteTransaction, loadTransactions } =
+    useTransactionsStore();
+  const { buckets, loadBuckets } = useBucketsStore();
   const { goals, loadGoals } = useGoalsStore();
   const {
     userName,
     monthStartDay,
+    earlyMonthStartDate,
     monthlyIncome,
     lastChecklistMonth,
     lastChecklistPromptMonth,
     efFloor,
     personalRecoveryDebt,
+    lastBalanceRolloverMonth,
+    lastSurplusRolloverMonth,
+    loadPlaybook,
     updatePlaybook,
   } = usePlaybookStore();
+  const { loadEntries } = useLendingStore();
   const {
     totalIncome,
     effectiveIncome,
     safeToSpend,
     yourMoney,
+    bankPile,
     stillInBank,
     monthRemainingBalance,
     carriedForwardBalance,
@@ -96,14 +118,14 @@ export default function HomeScreen() {
     moneyAccounts,
   } = usePulseData();
 
-  const { seedFromYourMoney, reconcileToYourMoney } = useAccountsStore();
+  const { seedFromYourMoney, syncBankToPile } = useAccountsStore();
 
   useEffect(() => {
     void (async () => {
-      await seedFromYourMoney(yourMoney);
-      await reconcileToYourMoney(yourMoney);
+      await seedFromYourMoney(bankPile);
+      await syncBankToPile(bankPile);
     })();
-  }, [yourMoney, seedFromYourMoney, reconcileToYourMoney]);
+  }, [bankPile, seedFromYourMoney, syncBankToPile]);
 
   const [promptVisible, setPromptVisible] = useState(false);
   const [checklistVisible, setChecklistVisible] = useState(false);
@@ -113,10 +135,11 @@ export default function HomeScreen() {
     null,
   );
   const [capPromptVisible, setCapPromptVisible] = useState(false);
+  const [startingMonthEarly, setStartingMonthEarly] = useState(false);
 
   const flagged = transactions.filter((t) => t.isFlagged);
 
-  const monthKey = currentMonthKey(monthStartDay);
+  const monthKey = currentMonthKey(monthStartDay, earlyMonthStartDate);
 
   // Determine which checklist items are already completed this month
   // by checking if matching transactions exist
@@ -178,6 +201,12 @@ export default function HomeScreen() {
 
   const checklistAllDone = checklistItems.every((i) => i.completed);
   const checklistPending = lastChecklistMonth !== monthKey && !checklistAllDone;
+  const daysUntilRegularStart = getDaysUntilNextRegularStart(monthStartDay);
+  const canStartMonthEarly =
+    !earlyMonthStartDate &&
+    hasSalaryThisMonth &&
+    daysUntilRegularStart >= 1 &&
+    daysUntilRegularStart <= 7;
 
   useEffect(() => {
     if (lastChecklistPromptMonth !== monthKey && !checklistAllDone) {
@@ -310,7 +339,7 @@ export default function HomeScreen() {
 
   const progressByBucket = useMemo(() => {
     const cumulativeConfirmed = (bucketId: string) =>
-      transactions
+      allTransactions
         .filter(
           (t) => t.bucketId === bucketId && t.remarks === "__savings_confirm__",
         )
@@ -346,7 +375,7 @@ export default function HomeScreen() {
       }
     }
     return map;
-  }, [goalGroups, standaloneBuckets, transactions, goals, efValue, efFloor]);
+  }, [goalGroups, standaloneBuckets, allTransactions, goals, efValue, efFloor]);
 
   const personalBucket = buckets.find((b) => b.id === PERSONAL_BUCKET_ID);
   const personalBalance = personalBucket
@@ -363,7 +392,7 @@ export default function HomeScreen() {
   }, [personalBucket?.id, personalBalance]);
 
   useEffect(() => {
-    checkAndCompleteGoals(goals, transactions).then((completed) => {
+    checkAndCompleteGoals(goals, allTransactions).then((completed) => {
       if (completed.length > 0) {
         loadGoals();
         useBucketsStore.getState().loadBuckets();
@@ -381,7 +410,7 @@ export default function HomeScreen() {
         );
       }
     });
-  }, [transactions, goals]);
+  }, [allTransactions, goals]);
 
   const handleUndoChecklistItem = (id: string) => {
     Alert.alert(
@@ -403,6 +432,127 @@ export default function HomeScreen() {
                 (t) => t.bucketId === id && t.remarks === "__savings_confirm__",
               );
               if (txn) await deleteTransaction(txn.id);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleStartMonthEarly = () => {
+    Alert.alert(
+      "Start new month today?",
+      `Closes this month, logs NPR ${formatNPR(monthlyIncome)} salary, and counts spending from today in the new month. Your regular start day stays ${monthStartDay}.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Start month",
+          onPress: async () => {
+            if (startingMonthEarly) return;
+            setStartingMonthEarly(true);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const earlyStartKey = toLocalDateKey(today);
+            try {
+              applySchemaPatches();
+              const beforeCeilings = useBucketsStore
+                .getState()
+                .buckets.filter((b) => b.type === "spending" && b.isActive)
+                .map((b) => ({ id: b.id, monthlyAmount: b.monthlyAmount }));
+              // Carry is the cash pile on the card now. Today's paid bills stay
+              // in the new period, so add them back (and drop today's borrow)
+              // or they would be deducted twice.
+              const todayEnd = new Date(today);
+              todayEnd.setHours(23, 59, 59, 999);
+              await useLendingStore.getState().loadAllEntries();
+              const lendingState = useLendingStore.getState();
+              const lendingRows =
+                lendingState.allEntries.length > 0
+                  ? lendingState.allEntries
+                  : lendingState.entries;
+              const lendToday = computeMonthMetrics(
+                lendingRows,
+                today,
+                todayEnd,
+              ).lendBorrowCashAdjust;
+              const cashNow = Math.max(
+                0,
+                bankPile +
+                  movedIntoNewPeriodAdjust(
+                    useTransactionsStore.getState().transactions,
+                    lendToday,
+                    today,
+                  ),
+              );
+              const surplusKey = await runSurplusRollover(
+                monthStartDay,
+                lastSurplusRolloverMonth,
+                earlyStartKey,
+                { cashOnHand: cashNow },
+              );
+              const balanceKey = await runMonthRollover(
+                monthStartDay,
+                lastBalanceRolloverMonth,
+                earlyStartKey,
+              );
+              await loadPlaybook();
+              await updatePlaybook({
+                earlyMonthStartDate: earlyStartKey,
+                lastBalanceRolloverMonth: balanceKey,
+                lastSurplusRolloverMonth: surplusKey,
+              });
+              await loadBuckets();
+              restoreWipedSpendingCeilings();
+              await loadBuckets();
+
+              const { start, end } = getMonthRange(
+                monthStartDay,
+                earlyStartKey,
+                today,
+              );
+              await Promise.all([
+                loadTransactions(start, end),
+                loadEntries(start, end),
+              ]);
+              await addTransaction({
+                type: "income",
+                amount: monthlyIncome,
+                description: "Salary received",
+                merchant: "Salary",
+                bucketId: INCOME_BUCKET_ID,
+                date: start.toISOString(),
+                source: "manual",
+                remarks: "__salary__",
+                fundedFromBucketId: null,
+                parsedTxnId: null,
+                isFlagged: false,
+                isRecurringDraft: false,
+              });
+              await loadBuckets();
+
+              // Guard: Paid early must never wipe Living ceilings.
+              const after = useBucketsStore.getState().buckets;
+              const wiped = beforeCeilings.filter((b) => {
+                if (!b.monthlyAmount || b.monthlyAmount <= 0) return false;
+                const next = after.find((x) => x.id === b.id);
+                return !next || !next.monthlyAmount;
+              });
+              if (wiped.length > 0) {
+                for (const b of wiped) {
+                  await useBucketsStore
+                    .getState()
+                    .updateBucket(b.id, { monthlyAmount: b.monthlyAmount });
+                }
+                await loadBuckets();
+              }
+              setChecklistVisible(true);
+            } catch (error) {
+              Alert.alert(
+                "Could not start month",
+                error instanceof Error ? error.message : "Please try again.",
+              );
+            } finally {
+              setStartingMonthEarly(false);
             }
           },
         },
@@ -525,6 +675,10 @@ export default function HomeScreen() {
           daysRemaining={daysRemaining}
           weeklyRate={weeklyRate}
           flaggedAmount={flaggedAmount}
+          onStartMonthEarly={
+            canStartMonthEarly ? handleStartMonthEarly : undefined
+          }
+          startingMonthEarly={startingMonthEarly}
         />
 
         <LentBorrowRow

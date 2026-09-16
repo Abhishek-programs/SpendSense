@@ -10,9 +10,8 @@ import {
   StyleSheet,
   Pressable,
   Animated,
-  Platform,
-  AppState,
 } from 'react-native'
+import { router } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/constants/colors'
@@ -44,14 +43,6 @@ import { seedDefaults } from '@/db/seed'
 import { useLendingStore } from '@/store/lending'
 import { useAccountsStore } from '@/store/accounts'
 import { BANK_ACCOUNT_ID, ESEWA_ACCOUNT_ID } from '@/constants/accounts'
-import {
-  getPaymentWatchEnabled,
-  hasPaymentWatchUsageAccess,
-  isPaymentWatchAvailable,
-  openPaymentWatchUsageSettings,
-  setPaymentWatchEnabled,
-} from '@/lib/payment-watch'
-import { requestPermissions } from '@/lib/notifications'
 
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
 
@@ -461,98 +452,24 @@ function MoneyLocationsCard() {
   )
 }
 
-function PaymentWatchCard() {
-  const available = isPaymentWatchAvailable()
-  const [enabled, setEnabled] = useState(false)
-  const [usage, setUsage] = useState(false)
-
-  const refresh = useCallback(async () => {
-    if (!available) return
-    const [on, access] = await Promise.all([
-      getPaymentWatchEnabled(),
-      hasPaymentWatchUsageAccess(),
-    ])
-    setEnabled(on)
-    setUsage(access)
-  }, [available])
-
-  useEffect(() => {
-    refresh()
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh()
-    })
-    return () => sub.remove()
-  }, [refresh])
-
-  if (Platform.OS !== 'android') return null
-
-  const onToggle = async (value: boolean) => {
-    if (!available) return
-    if (value) {
-      await requestPermissions()
-    }
-    const result = await setPaymentWatchEnabled(value)
-    await refresh()
-    if (value && result === 'needs_usage_access') {
-      Alert.alert(
-        'Usage access needed',
-        'Android will show a list of apps. Find SpendSense and turn usage access on. We never record your screen — we only see which app is open so we can offer a log notification.',
-        [
-          { text: 'Later', style: 'cancel' },
-          { text: 'Open settings', onPress: () => openPaymentWatchUsageSettings() },
-        ],
-      )
-    }
-  }
-
+function NotificationSettingsCard() {
   return (
     <>
-      <SectionHeader
-        title="Payment helper"
-        description="While eSewa or nBank is open, type the amount in a notification. Assign a bucket the next time you open SpendSense. Off until you enable it."
-      />
+      <SectionHeader title="Notif." description="Payment notification and watched apps" />
       <Card>
-        {!available ? (
-          <Text style={styles.sectionDesc}>
-            Needs a development build (not Expo Go). Rebuild with npx expo run:android.
-          </Text>
-        ) : (
-          <>
-            <View style={styles.toggleRow}>
-              <Text style={[styles.editableLabel, { flex: 1, paddingRight: 12 }]}>
-                Log from eSewa / nBank
-              </Text>
-              <Switch
-                value={enabled}
-                onValueChange={onToggle}
-                trackColor={{ false: colors.border, true: colors.greenFill }}
-                thumbColor={enabled ? colors.green : '#f4f3f4'}
-              />
-            </View>
-            {enabled && !usage && (
-              <>
-                <View style={styles.divider} />
-                <Text style={[styles.sectionDesc, { marginBottom: 10 }]}>
-                  Usage access is off. SpendSense cannot tell when a payment app is open.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => openPaymentWatchUsageSettings()}
-                  style={styles.actionButton}
-                >
-                  <Text style={styles.actionButtonText}>Grant usage access</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            {enabled && usage && (
-              <>
-                <View style={styles.divider} />
-                <Text style={styles.sectionDesc}>
-                  A notification appears about 5 seconds after eSewa or nBank is open. After you log and pick a bucket, it stays gone until you leave that app.
-                </Text>
-              </>
-            )}
-          </>
-        )}
+        <TouchableOpacity
+          style={styles.mappingRow}
+          onPress={() => router.push('/notification-settings')}
+          accessibilityRole="button"
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.editableLabel}>Notification settings</Text>
+            <Text style={styles.mappingBucket}>
+              Reliability, timing, and payment apps
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
       </Card>
     </>
   )
@@ -619,6 +536,8 @@ export default function SettingsScreen() {
     if (!bucket) return
     const amt = parseInt(draft.monthlyAmount, 10)
     if (!draft.name.trim() || isNaN(amt) || amt < 0) return
+    // Blur/toggle auto-persist: a 0 from a stale draft must never wipe a live ceiling.
+    if (amt === 0 && bucket.monthlyAmount > 0) return
     const patch: Partial<Bucket> = {
       name: draft.name.trim(),
       monthlyAmount: amt,
@@ -1205,7 +1124,7 @@ export default function SettingsScreen() {
 
         <MoneyLocationsCard />
 
-        <PaymentWatchCard />
+        <NotificationSettingsCard />
 
         {/* Section 5: Notifications */}
         <SectionHeader title="Notifications" description="Nudge preferences (max 1 per day, quiet 10pm-8am)" />

@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm'
-import { db } from '@/db/client'
+import { db, restoreWipedSpendingCeilings } from '@/db/client'
 import { bucketBalances, buckets, playbook } from '@/db/schema'
 import { PERSONAL_BUCKET_ID } from '@/constants/defaults'
-import { getMonthRange } from '@/lib/month'
+import { getMonthRange, toLocalDateKey } from '@/lib/month'
 import type { Bucket } from '@/store/buckets'
 
 export const PERSONAL_RECOVERY_TOP_UP = 1000
@@ -18,9 +18,15 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-export function currentMonthKey(monthStartDay: number): string {
-  const { start } = getMonthRange(monthStartDay)
-  return start.toISOString().slice(0, 7)
+export function currentMonthKey(
+  monthStartDay: number,
+  earlyMonthStartDate?: string | null,
+): string {
+  const { start } = getMonthRange(monthStartDay, earlyMonthStartDate)
+  const startKey = toLocalDateKey(start)
+  return earlyMonthStartDate === startKey
+    ? `${startKey.slice(0, 7)}@early-${startKey}`
+    : startKey.slice(0, 7)
 }
 
 export async function getBucketBalance(bucketId: string): Promise<number> {
@@ -121,9 +127,15 @@ export async function ensureBalanceRow(bucketId: string): Promise<void> {
 export async function runMonthRollover(
   monthStartDay: number,
   lastRolloverMonth: string | null | undefined,
+  earlyMonthStartDate?: string | null,
 ): Promise<string> {
-  const monthKey = currentMonthKey(monthStartDay)
-  if (lastRolloverMonth === monthKey) return monthKey
+  const monthKey = currentMonthKey(monthStartDay, earlyMonthStartDate)
+  if (lastRolloverMonth === monthKey) {
+    restoreWipedSpendingCeilings()
+    return monthKey
+  }
+
+  restoreWipedSpendingCeilings()
 
   const pbRows = await db.select().from(playbook).limit(1)
   const pb = pbRows[0]
@@ -184,6 +196,7 @@ export async function runMonthRollover(
     }
   }
 
+  restoreWipedSpendingCeilings()
   return monthKey
 }
 

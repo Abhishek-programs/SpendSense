@@ -64,15 +64,17 @@ export function NetWorthCard({
 
           <Text style={styles.sub}>
 
+            {carriedForwardBalance > 0
+
+              ? `Includes NPR ${formatNPRShort(carriedForwardBalance)} carried forward`
+
+              : 'Cash on you right now'}
+
             {stillInBank > 0
 
-              ? `Includes NPR ${formatNPRShort(stillInBank)} not yet confirmed`
+              ? ` · NPR ${formatNPRShort(stillInBank)} not yet confirmed to Future`
 
-              : carriedForwardBalance > 0
-
-                ? `Includes NPR ${formatNPRShort(carriedForwardBalance)} carried forward`
-
-                : 'Cash on you right now'}
+              : ''}
 
           </Text>
 
@@ -97,30 +99,6 @@ export function NetWorthCard({
         <View style={styles.breakdown}>
 
           <View style={styles.divider} />
-
-
-
-          <View style={styles.breakdownRow}>
-
-            <View>
-
-              <Text style={styles.breakdownLabel}>Remaining this month</Text>
-
-              <Text style={styles.rolloverNote}>Rolls forward at month end</Text>
-
-            </View>
-
-            <Text
-              style={[
-                styles.breakdownValue,
-                monthRemainingBalance < 0 && { color: colors.red },
-              ]}
-            >
-              {monthRemainingBalance < 0 ? '−' : ''}
-              {formatNPRShort(Math.abs(monthRemainingBalance))}
-            </Text>
-
-          </View>
 
 
 
@@ -150,7 +128,7 @@ export function NetWorthCard({
 
                 <Text style={styles.breakdownLabel}>Not yet confirmed</Text>
 
-                <Text style={styles.rolloverNote}>Still in bank — confirm in Future</Text>
+                <Text style={styles.rolloverNote}>Already in the total — confirm in Future</Text>
 
               </View>
 

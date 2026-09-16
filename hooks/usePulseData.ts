@@ -6,10 +6,18 @@ import { useLendingStore } from '@/store/lending'
 import { useAccountsStore } from '@/store/accounts'
 import { getMonthRange, getDaysRemaining } from '@/lib/month'
 import { computeMonthMetrics } from '@/lib/lending/balance'
+import { computeCashOnHand, foundMoneyInRange, periodCashFromTransactions } from '@/lib/your-money'
 import { EF_BUCKET_ID, SIP_BUCKET_ID, SHARES_BUCKET_ID } from '@/constants/defaults'
+import { BANK_ACCOUNT_ID } from '@/constants/accounts'
 
 export function usePulseData() {
-  const { monthStartDay, monthlyIncome, efStartBalance, carriedForwardBalance } = usePlaybookStore()
+  const {
+    monthStartDay,
+    earlyMonthStartDate,
+    monthlyIncome,
+    efStartBalance,
+    carriedForwardBalance,
+  } = usePlaybookStore()
   const { buckets, bucketBalances } = useBucketsStore()
   const {
     flaggedTransactions,
@@ -18,6 +26,7 @@ export function usePulseData() {
     getConfirmedSavingsBuckets,
     addTransaction,
     transactions,
+    allTransactions,
   } = useTransactionsStore()
   const { goals } = useGoalsStore()
   const { allEntries, contacts, getLentOutTotal, getYouOweTotal, getTotalNetBalance } =
@@ -31,7 +40,7 @@ export function usePulseData() {
   const savingsBuckets = allSavingsBuckets.filter(b => b.isActive && b.showOnHome)
 
   const confirmedSavingIds = getConfirmedSavingsBuckets()
-  const { start, end } = getMonthRange(monthStartDay)
+  const { start, end } = getMonthRange(monthStartDay, earlyMonthStartDate)
 
   const spentByBucket: Record<string, number> = {}
   allSpendingBuckets.forEach(b => {
@@ -129,14 +138,23 @@ export function usePulseData() {
   const stillInBank = hasSalaryThisMonth ? unconfirmedSavingsThisMonth : 0
 
   const availableBalance = Math.max(0, adjustedSafeToSpend + carriedForwardBalance)
-  const { foundMoneyTotal, accounts: moneyAccounts } = useAccountsStore()
-  const yourMoney = Math.max(
-    0,
-    adjustedSafeToSpend + carriedForwardBalance + stillInBank + foundMoneyTotal,
-  )
+  const { foundMoneyTotal, accounts: moneyAccounts, adjustments } = useAccountsStore()
+  const periodCash = periodCashFromTransactions(transactions)
+  const bankPile = computeCashOnHand({
+    carriedForward: carriedForwardBalance,
+    income: periodCash.income,
+    expenses: periodCash.expenses,
+    fees: periodCash.fees,
+    lendingCashAdjust: lendBorrowCashAdjust,
+    foundThisPeriod: foundMoneyInRange(adjustments, start, end),
+  })
+  const otherWallets = moneyAccounts
+    .filter(a => a.id !== BANK_ACCOUNT_ID)
+    .reduce((s, a) => s + a.balance, 0)
+  const yourMoney = bankPile + otherWallets
   const monthRemainingBalance = adjustedSafeToSpend
 
-  const daysRemaining = getDaysRemaining(monthStartDay)
+  const daysRemaining = getDaysRemaining(monthStartDay, earlyMonthStartDate)
   const weeksRemaining = Math.max(1, daysRemaining / 7)
   const weeklyRate =
     daysRemaining > 0 ? Math.max(0, adjustedSafeToSpend) / weeksRemaining : 0
@@ -150,7 +168,7 @@ export function usePulseData() {
 
   const efBucket = buckets.find(b => b.id === EF_BUCKET_ID)
   const efContributions = efBucket
-    ? transactions
+    ? allTransactions
         .filter(t => t.bucketId === efBucket.id && t.remarks === '__savings_confirm__')
         .reduce((sum, t) => sum + t.amount, 0)
     : 0
@@ -159,7 +177,7 @@ export function usePulseData() {
   const activeGoals = goals.filter(g => g.isEnabled && !g.completedAt)
 
   const goalValue = (g: (typeof goals)[0]) => {
-    const current = transactions
+    const current = allTransactions
       .filter(t => g.linkedBucketIds.includes(t.bucketId) && t.remarks === '__savings_confirm__')
       .reduce((sum, t) => sum + t.amount, 0)
     return g.startBalance + current
@@ -175,13 +193,13 @@ export function usePulseData() {
 
   const sipLifetime = sipGoal
     ? goalValue(sipGoal)
-    : transactions
+    : allTransactions
         .filter(t => t.bucketId === SIP_BUCKET_ID && t.remarks === '__savings_confirm__')
         .reduce((sum, t) => sum + t.amount, 0)
 
   const sharesLifetime = sharesGoal
     ? goalValue(sharesGoal)
-    : transactions
+    : allTransactions
         .filter(t => t.bucketId === SHARES_BUCKET_ID && t.remarks === '__savings_confirm__')
         .reduce((sum, t) => sum + t.amount, 0)
 
@@ -209,6 +227,7 @@ export function usePulseData() {
     hasSalaryThisMonth,
     availableBalance,
     yourMoney,
+    bankPile,
     stillInBank,
     safeToSpend: adjustedSafeToSpend,
     rawSafeToSpend: safeToSpend,

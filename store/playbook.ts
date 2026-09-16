@@ -14,6 +14,7 @@ interface PlaybookState {
   userName: string | null
   monthlyIncome: number
   monthStartDay: number
+  earlyMonthStartDate: string | null
   fallbackBucketId: string | null
   efFloor: number
   efStartBalance: number
@@ -37,10 +38,32 @@ interface PlaybookState {
   resetPersonalRecovery: () => Promise<void>
 }
 
+// Only these keys map to playbook columns — nudgeToggles and friends live in memory only.
+const PLAYBOOK_COLUMNS = {
+  userName: true,
+  monthlyIncome: true,
+  monthStartDay: true,
+  earlyMonthStartDate: true,
+  fallbackBucketId: true,
+  efFloor: true,
+  efStartBalance: true,
+  isOnboarded: true,
+  lastChecklistMonth: true,
+  lastChecklistPromptMonth: true,
+  lastBalanceRolloverMonth: true,
+  userAge: true,
+  carriedForwardBalance: true,
+  lastSurplusRolloverMonth: true,
+  lastPersonalRebalancePromptMonth: true,
+  personalRecoveryDebt: true,
+  personalNormalTopUp: true,
+} as const
+
 export const usePlaybookStore = create<PlaybookState>((set, get) => ({
   userName: null,
   monthlyIncome: 125000,
   monthStartDay: 1,
+  earlyMonthStartDate: null,
   fallbackBucketId: null,
   efFloor: 300000,
   efStartBalance: 0,
@@ -71,6 +94,7 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         userName: row.userName ?? null,
         monthlyIncome: row.monthlyIncome,
         monthStartDay: row.monthStartDay,
+        earlyMonthStartDate: row.earlyMonthStartDate ?? null,
         fallbackBucketId: row.fallbackBucketId ?? null,
         efFloor: row.efFloor,
         efStartBalance: row.efStartBalance ?? 0,
@@ -92,34 +116,16 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
   },
 
   updatePlaybook: async (patch) => {
+    const prev = get()
     set(patch as any)
-    const state = get()
     const rows = await db.select().from(playbook).limit(1)
-    if (rows.length > 0) {
-      await db.update(playbook).set({
-        userName: state.userName,
-        monthlyIncome: state.monthlyIncome,
-        monthStartDay: state.monthStartDay,
-        fallbackBucketId: state.fallbackBucketId,
-        efFloor: state.efFloor,
-        efStartBalance: state.efStartBalance,
-        isOnboarded: state.isOnboarded,
-        lastChecklistMonth: state.lastChecklistMonth,
-        lastChecklistPromptMonth: state.lastChecklistPromptMonth,
-        lastBalanceRolloverMonth: state.lastBalanceRolloverMonth,
-        userAge: state.userAge,
-        carriedForwardBalance: state.carriedForwardBalance,
-        lastSurplusRolloverMonth: state.lastSurplusRolloverMonth,
-        lastPersonalRebalancePromptMonth: state.lastPersonalRebalancePromptMonth,
-        personalRecoveryDebt: state.personalRecoveryDebt,
-        personalNormalTopUp: state.personalNormalTopUp,
-      }).where(eq(playbook.id, rows[0].id))
-    } else {
-      // Create record if not exists (should already happen in seedDefaults, but good to have)
+    if (rows.length === 0) {
+      const state = get()
       await db.insert(playbook).values({
         userName: state.userName,
         monthlyIncome: state.monthlyIncome,
         monthStartDay: state.monthStartDay,
+        earlyMonthStartDate: state.earlyMonthStartDate,
         fallbackBucketId: state.fallbackBucketId,
         efFloor: state.efFloor,
         efStartBalance: state.efStartBalance,
@@ -134,6 +140,52 @@ export const usePlaybookStore = create<PlaybookState>((set, get) => ({
         personalRecoveryDebt: state.personalRecoveryDebt,
         personalNormalTopUp: state.personalNormalTopUp,
       })
+      return
+    }
+
+    const write = async () => {
+      const state = get()
+      const values = Object.fromEntries(
+        Object.keys(patch)
+          .filter(key => key in PLAYBOOK_COLUMNS)
+          .map(key => [key, (state as any)[key]]),
+      )
+      if (Object.keys(values).length === 0) return
+      await db.update(playbook).set(values).where(eq(playbook.id, rows[0].id))
+    }
+    try {
+      await write()
+    } catch (error) {
+      // Older installs may miss new playbook columns until patches run.
+      const { applySchemaPatches } = await import('@/db/client')
+      applySchemaPatches()
+      try {
+        await write()
+      } catch (retryError) {
+        // Roll back optimistic UI state so a failed Paid early can't leave a half-applied month.
+        set({
+          userName: prev.userName,
+          monthlyIncome: prev.monthlyIncome,
+          monthStartDay: prev.monthStartDay,
+          earlyMonthStartDate: prev.earlyMonthStartDate,
+          fallbackBucketId: prev.fallbackBucketId,
+          efFloor: prev.efFloor,
+          efStartBalance: prev.efStartBalance,
+          isOnboarded: prev.isOnboarded,
+          lastChecklistMonth: prev.lastChecklistMonth,
+          lastChecklistPromptMonth: prev.lastChecklistPromptMonth,
+          lastBalanceRolloverMonth: prev.lastBalanceRolloverMonth,
+          userAge: prev.userAge,
+          carriedForwardBalance: prev.carriedForwardBalance,
+          lastSurplusRolloverMonth: prev.lastSurplusRolloverMonth,
+          lastPersonalRebalancePromptMonth: prev.lastPersonalRebalancePromptMonth,
+          personalRecoveryDebt: prev.personalRecoveryDebt,
+          personalNormalTopUp: prev.personalNormalTopUp,
+          nudgeToggles: prev.nudgeToggles,
+          lastNotificationDate: prev.lastNotificationDate,
+        })
+        throw retryError
+      }
     }
   },
 

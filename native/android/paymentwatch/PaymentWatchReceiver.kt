@@ -24,7 +24,7 @@ class PaymentWatchReceiver : BroadcastReceiver() {
       return
     }
     val pkg = intent.getStringExtra(PaymentWatchService.EXTRA_PACKAGE).orEmpty()
-    val appName = PaymentWatchPrefs.merchantLabel(pkg)
+    val appName = PaymentWatchPrefs.merchantLabel(context, pkg)
     val accountId = PaymentWatchDb.accountIdForPackage(pkg)
     val id = PaymentWatchDb.insertFlaggedExpense(context, parsed.amount, appName, parsed.label, accountId)
     if (id == null) {
@@ -35,11 +35,12 @@ class PaymentWatchReceiver : BroadcastReceiver() {
     val chips = PaymentWatchDb.spendingBucketNames(context)
     if (chips.isNotEmpty()) {
       PaymentWatchPrefs.setPendingTxn(context, id, parsed.amount, parsed.label ?: "Payment")
+      Toast.makeText(context, "Logged NPR ${parsed.amount.toInt()} — pick a bucket", Toast.LENGTH_SHORT).show()
     } else {
       PaymentWatchPrefs.setDoneThisVisit(context, true)
       PaymentWatchService.clearLogUi(context)
+      Toast.makeText(context, "Logged NPR ${parsed.amount.toInt()}", Toast.LENGTH_SHORT).show()
     }
-    Toast.makeText(context, "Logged NPR ${parsed.amount.toInt()} — pick a bucket", Toast.LENGTH_SHORT).show()
     PaymentWatchService.start(context)
   }
 

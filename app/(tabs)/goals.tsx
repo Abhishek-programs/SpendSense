@@ -20,7 +20,8 @@ const EF_PSEUDO_ID = '__ef_goal__'
 export default function GoalsScreen() {
   const insets = useSafeAreaInsets()
   const { goals } = useGoalsStore()
-  const { transactions } = useTransactionsStore()
+  // Goal progress is lifetime, not this period — a new month must not reset it.
+  const { allTransactions: transactions } = useTransactionsStore()
   const { buckets } = useBucketsStore()
   const { efFloor, efStartBalance, userAge, monthlyIncome } = usePlaybookStore()
 

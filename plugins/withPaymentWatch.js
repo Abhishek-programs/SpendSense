@@ -103,6 +103,25 @@ function withPaymentWatch(config) {
       })
     }
 
+    if (!manifest.manifest.queries) manifest.manifest.queries = []
+    const hasLauncherQuery = manifest.manifest.queries.some((query) =>
+      query.intent?.some((intent) =>
+        intent.action?.some(
+          (action) => action.$['android:name'] === 'android.intent.action.MAIN',
+        ),
+      ),
+    )
+    if (!hasLauncherQuery) {
+      manifest.manifest.queries.push({
+        intent: [
+          {
+            action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }],
+          },
+        ],
+      })
+    }
+
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest)
     if (!app.service) app.service = []
     if (!app.receiver) app.receiver = []
@@ -141,13 +160,11 @@ function withPaymentWatch(config) {
         $: {
           'android:name': '.paymentwatch.PaymentWatchBootReceiver',
           'android:exported': 'true',
-          'android:directBootAware': 'true',
         },
         'intent-filter': [
           {
             action: [
               { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
-              { $: { 'android:name': 'android.intent.action.LOCKED_BOOT_COMPLETED' } },
             ],
           },
         ],

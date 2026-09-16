@@ -23,13 +23,14 @@ Headers use safe-area inset (`insets.top + 12`) on all tabs.
 ### Your money card (collapsed default)
 | Collapsed | Expanded |
 |-----------|----------|
-| **Your money** — cash on you now | Remaining this month · carried-forward · not-yet-confirmed (still in bank) |
+| **Your money** — cash on you now | Carry + this period’s cash flow · wallets (Bank / eSewa / Cash) |
 | | **Net worth** — confirmed EF, goals, SIP, shares |
 
 Net worth accordion: **Lent out** (asset) · **You owe** (liability).
 
 ### Hero ring
 - **Center:** Safe to spend (locked until salary confirmed this month)
+- **Paid early? pill:** visible during the 7 days before the configured month start when the current salary is already confirmed. Confirmation closes the old period and starts the new plan today without changing the configured day.
 - **Arcs:** green available · red spent · purple lent out (this month) · teal savings (confirmed + unconfirmed)
 - **Stroke:** uniform width on all arcs; unconfirmed savings use lower opacity (not a thicker stroke)
 - **Orbit chips** (compact, color-only numbers on ring edge, subtle float animation): `{days}d` · spent · saved (saved only when > 0)
@@ -92,7 +93,7 @@ Personal: balance vs cap. Section subtitle: **Ceilings & personal fund**.
 
 ## Settings
 
-Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · **payment helper** (eSewa / nBank) · notifications · CSV export · reset all data
+Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · **Notif.** (Payment Helper toggle, persistent/best-effort mode, 0–60 second delay, installed app picker; eSewa/nBank defaults) · nudge notifications · CSV export · reset all data
 
 ---
 
@@ -112,11 +113,12 @@ Playbook (income, month start, EF floor, age) · buckets · keywords · sure-sho
 ```
 effectiveIncome      = salary txn amount if confirmed this month else 0
 safeToSpend          = spendingPlan - lifestyleSpent - personalDraws + max(0, effectiveIncome - totalAllocations) + lendingCashAdjust - fees
-yourMoney            = max(0, safeToSpend + carriedForwardBalance + stillInBank + foundMoney)
+bankPile             = max(0, carriedForward + periodIncome - periodExpenses - fees + lendingCashAdjust + foundThisPeriod)
+yourMoney            = bankPile + eSewa + Cash
 stillInBank          = salary confirmed ? max(0, plannedSavings - confirmedSavedInvested) : 0
 efFloor              = coreLiving × 6
 suggestSipTarget     = income × 12 × max(10, 60 - age) × 0.15  (when age set)
-nextCarry            = max(0, carriedForwardBalance + previousMonthSafeToSpend + previousMonthStillInBank)
+nextCarry            = bank pile on the card at close + today’s expenses − today’s income − today’s lending-in (those stay in the new period; Cash is not folded into Bank)
 ```
 
 SIP confirms are shown in NPR 5,000 chunks (last chunk may be smaller); each chunk accepts its own fee. The Month Start Ritual auto-opens only once per playbook month while its pending banner remains available.

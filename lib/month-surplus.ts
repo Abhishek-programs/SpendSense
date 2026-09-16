@@ -1,27 +1,13 @@
 import { and, gte, lte } from 'drizzle-orm'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { buckets, lendBorrowEntries, playbook, transactions } from '@/db/schema'
+import { accountAdjustments, lendBorrowEntries, playbook, transactions } from '@/db/schema'
 import { currentMonthKey } from '@/lib/bucket-balance'
-import { getMonthRange } from '@/lib/month'
+import { getPreviousMonthRange } from '@/lib/month'
 import type { Bucket } from '@/store/buckets'
 import type { Transaction } from '@/store/transactions'
 import { computeMonthMetrics, type LendBorrowEntry } from '@/lib/lending/balance'
-
-function getPreviousMonthRange(monthStartDay: number): { start: Date; end: Date } {
-  const { start: currentStart } = getMonthRange(monthStartDay)
-  const prevEnd = new Date(currentStart.getTime() - 1)
-  const prevStart = new Date(
-    currentStart.getFullYear(),
-    currentStart.getMonth() - 1,
-    monthStartDay,
-    0,
-    0,
-    0,
-    0,
-  )
-  return { start: prevStart, end: prevEnd }
-}
+import { computeCashOnHand, periodCashFromTransactions } from '@/lib/your-money'
 
 export function computeMonthSurplus(
   monthlyIncome: number,
@@ -105,40 +91,21 @@ export function computeMonthSurplus(
   return monthLeftover
 }
 
-export async function runSurplusRollover(
-  monthStartDay: number,
-  lastSurplusRolloverMonth: string | null | undefined,
-): Promise<string> {
-  const monthKey = currentMonthKey(monthStartDay)
-  if (lastSurplusRolloverMonth === monthKey) return monthKey
-
-  const pbRows = await db.select().from(playbook).limit(1)
-  if (pbRows.length === 0) return monthKey
-
-  const pb = pbRows[0]
-  const allBuckets = await db.select().from(buckets)
-  const activeBuckets = allBuckets
-    .filter(b => b.isActive)
-    .map(b => ({
-      id: b.id,
-      name: b.name,
-      type: b.type as Bucket['type'],
-      monthlyAmount: b.monthlyAmount,
-      color: b.color,
-      icon: b.icon,
-      sortOrder: b.sortOrder,
-      isActive: b.isActive,
-      showOnHome: b.showOnHome,
-      accumulates: b.accumulates ?? false,
-      accumulationCap: b.accumulationCap ?? null,
-    }))
-
-  const { start, end } = getPreviousMonthRange(monthStartDay)
+/** Cash on hand for [start, end]. Today's borrow/spend must not be in this window. */
+export async function cashOnHandForRange(
+  start: Date,
+  end: Date,
+  carriedForward: number,
+): Promise<number> {
   const prevTxns = await db
     .select()
     .from(transactions)
-    .where(and(gte(transactions.date, start.toISOString()), lte(transactions.date, end.toISOString())))
-
+    .where(
+      and(
+        gte(transactions.date, start.toISOString()),
+        lte(transactions.date, end.toISOString()),
+      ),
+    )
   const mappedTxns: Transaction[] = prevTxns.map(t => ({
     ...t,
     feeAmount: t.feeAmount ?? 0,
@@ -146,22 +113,50 @@ export async function runSurplusRollover(
     remarks: t.remarks ?? null,
     parsedTxnId: t.parsedTxnId ?? null,
   }))
-
   const lendingRows = await db.select().from(lendBorrowEntries)
   const mappedLending: LendBorrowEntry[] = lendingRows.map(e => ({
     ...e,
     type: e.type as LendBorrowEntry['type'],
     note: e.note ?? null,
   }))
-  const lendingCashAdjust = computeMonthMetrics(mappedLending, start, end).lendBorrowCashAdjust
-  const surplus = computeMonthSurplus(
-    pb.monthlyIncome,
-    activeBuckets,
-    mappedTxns,
-    lendingCashAdjust,
-  )
+  const cash = periodCashFromTransactions(mappedTxns)
+  return computeCashOnHand({
+    carriedForward,
+    income: cash.income,
+    expenses: cash.expenses,
+    fees: cash.fees,
+    lendingCashAdjust: computeMonthMetrics(mappedLending, start, end).lendBorrowCashAdjust,
+    // Found money stays on Your money for life; do not fold it into carry.
+    foundThisPeriod: 0,
+  })
+}
 
-  const newCarry = Math.max(0, (pb.carriedForwardBalance ?? 0) + surplus)
+export async function runSurplusRollover(
+  monthStartDay: number,
+  lastSurplusRolloverMonth: string | null | undefined,
+  earlyMonthStartDate?: string | null,
+  snapshot?: { cashOnHand: number },
+): Promise<string> {
+  const monthKey = currentMonthKey(monthStartDay, earlyMonthStartDate)
+  if (lastSurplusRolloverMonth === monthKey && !snapshot) return monthKey
+
+  const pbRows = await db.select().from(playbook).limit(1)
+  if (pbRows.length === 0) return monthKey
+
+  const pb = pbRows[0]
+
+  let newCarry: number
+  if (snapshot) {
+    // Paid early: Your money on the card + today's items that stay in the new period.
+    newCarry = Math.max(0, snapshot.cashOnHand)
+  } else {
+    const { start, end } = getPreviousMonthRange(
+      monthStartDay,
+      earlyMonthStartDate,
+    )
+    newCarry = await cashOnHandForRange(start, end, pb.carriedForwardBalance ?? 0)
+  }
+
   await db
     .update(playbook)
     .set({

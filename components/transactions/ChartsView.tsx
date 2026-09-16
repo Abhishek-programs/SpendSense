@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { BarChart } from 'react-native-gifted-charts'
 import { colors } from '@/constants/colors'
@@ -14,12 +14,20 @@ interface BucketSpend {
   color: string
 }
 
+interface MonthDetail {
+  total: number
+  fees: number
+  count: number
+  buckets: { label: string; value: number; color: string }[]
+}
+
 interface ChartsViewProps {
   spendingByBucket: BucketSpend[]
   savingsByBucket?: { label: string; value: number; target: number; color: string; confirmed: boolean }[]
   goals?: { name: string; current: number; target: number; projectedDate?: string }[]
   currentFees?: number
   period: 'month' | 'year'
+  getMonthDetail?: (monthKey: string) => MonthDetail
 }
 
 function getThresholdColor(spent: number, limit: number): string {
@@ -36,13 +44,16 @@ export function ChartsView({
   goals = [],
   currentFees = 0,
   period,
+  getMonthDetail,
 }: ChartsViewProps) {
   const [trendData, setTrendData] = useState<MonthlySpend[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedMonth, setSelectedMonth] = useState<MonthlySpend | null>(null)
 
   useEffect(() => {
     const months = period === 'year' ? 12 : 6
     setLoading(true)
+    setSelectedMonth(null)
     getMonthlySpendHistory(months)
       .then(setTrendData)
       .finally(() => setLoading(false))
@@ -78,16 +89,25 @@ export function ChartsView({
     ),
   }))
 
-  // Trend bar chart
-  const trendBarData = trendData.map(m => ({
-    value: m.total,
-    label: m.month,
-    frontColor: m.isCurrent ? colors.green : colors.green + '30',
-    topLabelComponent: () =>
-      m.total > 0 ? (
-        <Text style={styles.barTopLabel}>{formatNPRShort(m.total)}</Text>
-      ) : null,
-  }))
+  // Trend bar chart — tapping a bar opens that month's breakdown below
+  const trendBarData = trendData.map(m => {
+    const isSelected = selectedMonth?.monthKey === m.monthKey
+    return {
+      value: m.total,
+      label: m.month,
+      frontColor: isSelected || (!selectedMonth && m.isCurrent)
+        ? colors.green
+        : colors.green + '30',
+      onPress: () => setSelectedMonth(isSelected ? null : m),
+      topLabelComponent: () =>
+        m.total > 0 ? (
+          <Text style={styles.barTopLabel}>{formatNPRShort(m.total)}</Text>
+        ) : null,
+    }
+  })
+
+  const selectedDetail =
+    selectedMonth && getMonthDetail ? getMonthDetail(selectedMonth.monthKey) : null
 
   return (
     <View style={styles.container}>
@@ -178,6 +198,54 @@ export function ChartsView({
               animationDuration={400}
             />
           </View>
+        )}
+
+        {!loading && hasTrendData && (
+          selectedMonth ? (
+            <Animated.View style={styles.monthCard} entering={FadeIn.duration(200)}>
+              <View style={styles.monthCardHeader}>
+                <Text style={styles.monthCardTitle}>
+                  {selectedMonth.month} {selectedMonth.monthKey.slice(0, 4)}
+                </Text>
+                <TouchableOpacity hitSlop={10} onPress={() => setSelectedMonth(null)}>
+                  <Ionicons name="close" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.monthCardStats}>
+                <View>
+                  <Text style={styles.monthStatValue}>
+                    NPR {formatNPRShort(selectedMonth.total)}
+                  </Text>
+                  <Text style={styles.monthStatLabel}>Spent</Text>
+                </View>
+                <View>
+                  <Text style={styles.monthStatValue}>
+                    NPR {formatNPRShort(selectedMonth.fees)}
+                  </Text>
+                  <Text style={styles.monthStatLabel}>Fees</Text>
+                </View>
+                {selectedDetail && (
+                  <View>
+                    <Text style={styles.monthStatValue}>{selectedDetail.count}</Text>
+                    <Text style={styles.monthStatLabel}>Transactions</Text>
+                  </View>
+                )}
+              </View>
+              {selectedDetail && selectedDetail.buckets.length > 0 ? (
+                selectedDetail.buckets.map(b => (
+                  <View key={b.label} style={styles.monthBucketRow}>
+                    <View style={[styles.monthBucketDot, { backgroundColor: b.color }]} />
+                    <Text style={styles.monthBucketLabel} numberOfLines={1}>{b.label}</Text>
+                    <Text style={styles.monthBucketValue}>{formatNPRShort(b.value)}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.monthEmptyText}>No spending in this month</Text>
+              )}
+            </Animated.View>
+          ) : (
+            <Text style={styles.trendHint}>Tap a bar to see that month</Text>
+          )
         )}
       </Animated.View>
 
@@ -303,6 +371,81 @@ const styles = StyleSheet.create({
   },
   trendCard: {
     paddingTop: 28,
+  },
+  trendHint: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  monthCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginTop: 12,
+    borderCurve: 'continuous',
+  },
+  monthCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  monthCardTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+  },
+  monthCardStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  monthStatValue: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  monthStatLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  monthBucketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  monthBucketDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  monthBucketLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textSecond,
+  },
+  monthBucketValue: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  monthEmptyText: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textMuted,
   },
   // Horizontal bar chart styles
   hBarRow: {

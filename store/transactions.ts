@@ -37,9 +37,11 @@ export interface Transaction {
 
 interface TransactionsState {
   transactions: Transaction[]
+  allTransactions: Transaction[]
   flaggedTransactions: Transaction[]
   isLoaded: boolean
   loadTransactions: (monthStart: Date, monthEnd: Date) => Promise<void>
+  loadAllTransactions: () => Promise<void>
   addTransaction: (
     txn: Omit<Transaction, 'id' | 'createdAt' | 'accountId' | 'feeAmount'> & {
       accountId?: string | null
@@ -51,7 +53,11 @@ interface TransactionsState {
   getSpentByBucket: (bucketId: string) => number
   getConfirmedSavingsBuckets: () => Set<string>
   getTotalIncome: () => number
-  ensureSalaryTransaction: (monthStartDay: number, salary: number) => Promise<void>
+  ensureSalaryTransaction: (
+    monthStartDay: number,
+    salary: number,
+    earlyMonthStartDate?: string | null,
+  ) => Promise<void>
 }
 
 function generateId(): string {
@@ -103,6 +109,7 @@ async function restoreFundedFromDebit(
 
 export const useTransactionsStore = create<TransactionsState>((set, get) => ({
   transactions: [],
+  allTransactions: [],
   flaggedTransactions: [],
   isLoaded: false,
 
@@ -120,6 +127,13 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
       )
     const flagged = rows.filter(t => t.isFlagged)
     set({ transactions: rows, flaggedTransactions: flagged, isLoaded: true })
+    await get().loadAllTransactions()
+  },
+
+  // Full history — goal progress, past periods, and trends span more than one month.
+  loadAllTransactions: async () => {
+    const rows = await db.select().from(transactions)
+    set({ allTransactions: rows })
   },
 
   addTransaction: async (txn) => {
@@ -174,7 +188,12 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     const state = get()
     const allTxns = [...state.transactions, row]
     const flagged = allTxns.filter(t => t.isFlagged)
-    set({ transactions: allTxns, flaggedTransactions: flagged, isLoaded: true })
+    set({
+      transactions: allTxns,
+      allTransactions: [...state.allTransactions, row],
+      flaggedTransactions: flagged,
+      isLoaded: true,
+    })
 
     return { overspent }
   },
@@ -278,11 +297,14 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     }
 
     const state = get()
-    const updated = state.transactions.map(t =>
-      t.id === id ? { ...t, ...patch } : t
-    )
+    const applyPatch = (t: Transaction) => (t.id === id ? { ...t, ...patch } : t)
+    const updated = state.transactions.map(applyPatch)
     const flagged = updated.filter(t => t.isFlagged)
-    set({ transactions: updated, flaggedTransactions: flagged })
+    set({
+      transactions: updated,
+      allTransactions: state.allTransactions.map(applyPatch),
+      flaggedTransactions: flagged,
+    })
   },
 
   deleteTransaction: async (id) => {
@@ -326,7 +348,11 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     const state = get()
     const remaining = state.transactions.filter(t => t.id !== id)
     const flagged = remaining.filter(t => t.isFlagged)
-    set({ transactions: remaining, flaggedTransactions: flagged })
+    set({
+      transactions: remaining,
+      allTransactions: state.allTransactions.filter(t => t.id !== id),
+      flaggedTransactions: flagged,
+    })
   },
 
   getSpentByBucket: (bucketId: string) => {
@@ -383,9 +409,13 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
       .reduce((sum, t) => sum + t.amount, 0)
   },
 
-  ensureSalaryTransaction: async (monthStartDay: number, salary: number) => {
+  ensureSalaryTransaction: async (
+    monthStartDay: number,
+    salary: number,
+    earlyMonthStartDate?: string | null,
+  ) => {
     if (salary <= 0) return
-    const { start, end } = getMonthRange(monthStartDay)
+    const { start, end } = getMonthRange(monthStartDay, earlyMonthStartDate)
     const startStr = start.toISOString()
     const endStr = end.toISOString()
 
