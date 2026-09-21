@@ -152,12 +152,7 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
     if (!txn.isRecurringDraft) {
       const accounts = useAccountsStore.getState()
       if (txn.type === 'income') {
-        if (txn.remarks === '__salary__') {
-          await accounts.applyIncome(row.accountId, txn.amount)
-        } else {
-          // Non-salary income increases Your money (found/extra) into the chosen account
-          await accounts.addFoundMoney(row.accountId || defaultAccountId(), txn.amount, 'Income')
-        }
+        await accounts.applyIncome(row.accountId, txn.amount)
       } else if (txn.type === 'expense' && !txn.isFlagged) {
         await accounts.applyExpense(row.accountId, txn.amount + row.feeAmount)
       }
@@ -315,11 +310,7 @@ export const useTransactionsStore = create<TransactionsState>((set, get) => ({
       if (!txn.isRecurringDraft && !(txn.type === 'expense' && txn.isFlagged)) {
         const accounts = useAccountsStore.getState()
         if (txn.type === 'income') {
-          if (txn.remarks === '__salary__') {
-            await accounts.applyExpense(txn.accountId, txn.amount)
-          } else {
-            await accounts.addFoundMoney(txn.accountId || defaultAccountId(), -txn.amount, 'Income reversed')
-          }
+          await accounts.applyExpense(txn.accountId, txn.amount)
         } else if (txn.type === 'expense') {
           await accounts.applyIncome(txn.accountId, txn.amount + txn.feeAmount)
         }

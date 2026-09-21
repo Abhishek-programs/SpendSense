@@ -1,13 +1,13 @@
 package {{PACKAGE}}.paymentwatch
 
 import android.content.Intent
+import androidx.core.app.NotificationManagerCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
-import androidx.core.app.NotificationManagerCompat
 
 class PaymentWatchModule(private val ctx: ReactApplicationContext) :
   ReactContextBaseJavaModule(ctx) {
@@ -30,18 +30,6 @@ class PaymentWatchModule(private val ctx: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun isPersistentHelper(promise: Promise) {
-    promise.resolve(PaymentWatchPrefs.persistentHelper(ctx))
-  }
-
-  @ReactMethod
-  fun setPersistentHelper(persistent: Boolean, promise: Promise) {
-    PaymentWatchPrefs.setPersistentHelper(ctx, persistent)
-    PaymentWatchService.reconfigure(ctx)
-    promise.resolve(true)
-  }
-
-  @ReactMethod
   fun getLogDelayMs(promise: Promise) {
     promise.resolve(PaymentWatchPrefs.logDelayMs(ctx).toDouble())
   }
@@ -49,7 +37,7 @@ class PaymentWatchModule(private val ctx: ReactApplicationContext) :
   @ReactMethod
   fun setLogDelayMs(delayMs: Double, promise: Promise) {
     PaymentWatchPrefs.setLogDelayMs(ctx, delayMs.toLong())
-    PaymentWatchService.reconfigure(ctx)
+    if (PaymentWatchPrefs.isEnabled(ctx)) PaymentWatchService.start(ctx)
     promise.resolve(true)
   }
 
@@ -99,7 +87,7 @@ class PaymentWatchModule(private val ctx: ReactApplicationContext) :
       packages.getString(i)?.let { list.add(it) }
     }
     PaymentWatchPrefs.setTargetPackages(ctx, list)
-    PaymentWatchService.reconfigure(ctx)
+    if (PaymentWatchPrefs.isEnabled(ctx)) PaymentWatchService.start(ctx)
     promise.resolve(true)
   }
 

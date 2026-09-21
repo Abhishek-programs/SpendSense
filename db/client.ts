@@ -442,6 +442,21 @@ export function applySchemaPatches() {
        AND \`last_surplus_rollover_month\` = '2026-09@early-2026-09-16'
        AND \`carried_forward_balance\` = 570.47`,
   )
+
+  // CTZN was fully settled then hard-deleted. Keep this period's cash
+  // (Food borrow + settle) so Your money does not invent the SIP payoff back.
+  tryExec(
+    `INSERT INTO \`account_adjustments\` (\`id\`, \`account_id\`, \`amount\`, \`note\`, \`date\`, \`created_at\`)
+     SELECT 'lending-cash-mu3lccr3kjxl5y', 'bank', 1000, 'Lending cash', '2026-09-16T04:18:36.795Z', '2026-09-16T04:18:36.795Z'
+     WHERE NOT EXISTS (SELECT 1 FROM \`lend_borrow_entries\` WHERE \`id\` = 'mu3lccr3kjxl5y')
+       AND NOT EXISTS (SELECT 1 FROM \`account_adjustments\` WHERE \`id\` = 'lending-cash-mu3lccr3kjxl5y')`,
+  )
+  tryExec(
+    `INSERT INTO \`account_adjustments\` (\`id\`, \`account_id\`, \`amount\`, \`note\`, \`date\`, \`created_at\`)
+     SELECT 'lending-cash-mu4cnuos1qeep3', 'bank', -6004.52, 'Lending cash', '2026-09-16T17:03:33.148Z', '2026-09-16T17:03:33.148Z'
+     WHERE NOT EXISTS (SELECT 1 FROM \`lend_borrow_entries\` WHERE \`id\` = 'mu4cnuos1qeep3')
+       AND NOT EXISTS (SELECT 1 FROM \`account_adjustments\` WHERE \`id\` = 'lending-cash-mu4cnuos1qeep3')`,
+  )
 }
 
 let migrationsPromise: Promise<void> | null = null

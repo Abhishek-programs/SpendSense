@@ -93,7 +93,7 @@ Personal: balance vs cap. Section subtitle: **Ceilings & personal fund**.
 
 ## Settings
 
-Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · **Notif.** (Payment Helper toggle, persistent/best-effort mode, 0–60 second delay, installed app picker; eSewa/nBank defaults) · nudge notifications · CSV export · reset all data
+Playbook (income, month start, EF floor, age) · buckets · keywords · sure-shot merchants · Payment helper (delay + watched apps + log notification) · nudge notifications · Share for Claude (on-demand markdown snapshot) · CSV export · reset all data
 
 ---
 
@@ -147,4 +147,5 @@ Living overspend never reallocates or changes other bucket ceilings.
 | Description field + word categorize | Shipped |
 | Manual entry (expense / income / lend-borrow) | Shipped |
 | Payment helper (usage access + reply notification) | Shipped (dev client) |
+| Share for Claude (local markdown snapshot) | Shipped (local) |
 | Recurring drafts | Not shipped |

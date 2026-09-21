@@ -10,7 +10,10 @@ import {
   computeTotalNetBalance,
   computeLentOutAsset,
   computeYouOweLiability,
+  entryCashDelta,
 } from '@/lib/lending/balance'
+import { useAccountsStore } from '@/store/accounts'
+import { BANK_ACCOUNT_ID } from '@/constants/accounts'
 
 export type { Contact, LendBorrowEntry, LendBorrowType }
 
@@ -162,6 +165,11 @@ export const useLendingStore = create<LendingState>((set, get) => ({
   },
 
   deleteEntry: async (id: string) => {
+    if (get().allEntries.length === 0) await get().loadAllEntries()
+    const existing = get().allEntries.find(e => e.id === id)
+    if (existing) {
+      await keepDeletedLendingCash([existing], get().allEntries)
+    }
     await db.delete(lendBorrowEntries).where(eq(lendBorrowEntries.id, id))
     await get().loadAllEntries()
     if (cachedMonthRange) {
@@ -170,6 +178,9 @@ export const useLendingStore = create<LendingState>((set, get) => ({
   },
 
   deleteContact: async (id: string) => {
+    if (get().allEntries.length === 0) await get().loadAllEntries()
+    const theirs = get().allEntries.filter(e => e.contactId === id)
+    await keepDeletedLendingCash(theirs, get().allEntries)
     await db.delete(lendBorrowEntries).where(eq(lendBorrowEntries.contactId, id))
     await db.delete(contacts).where(eq(contacts.id, id))
     await get().loadAllEntries()
@@ -188,6 +199,24 @@ export const useLendingStore = create<LendingState>((set, get) => ({
 
   getYouOweTotal: () => computeYouOweLiability(get().contacts, get().allEntries),
 }))
+
+async function keepDeletedLendingCash(
+  removed: LendBorrowEntry[],
+  allEntries: LendBorrowEntry[],
+) {
+  const accounts = useAccountsStore.getState()
+  for (const entry of removed) {
+    const amount = entryCashDelta(entry, allEntries)
+    if (amount === 0) continue
+    await accounts.recordCashAdjustment({
+      id: `lending-cash-${entry.id}`,
+      accountId: BANK_ACCOUNT_ID,
+      amount,
+      note: 'Lending cash',
+      date: entry.date,
+    })
+  }
+}
 
 function mapEntry(row: typeof lendBorrowEntries.$inferSelect): LendBorrowEntry {
   return {

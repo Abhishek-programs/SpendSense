@@ -99,13 +99,13 @@ Separate from buckets and the transaction ledger's income/expense flow:
 - **Lend** — cash left you; reduces safe-to-spend for the month; purple ring slice
 - **Borrow** — cash received; temporarily increases available balance
 - **Settle** — partial or full repayment; not income or expense
-- Entries and people can be edited/deleted; deleting a person removes their lending history
+- Entries and people can be edited/deleted; deleting a person removes their lending history. Cash that already moved stays in Your money.
 - Paying a settlement leaves Your money; receiving one adds to it, without touching Living buckets
 - Per-person net balance; home row shows total net across all people
 
 ### Payment helper (Android)
 
-Settings → **Notif.** controls the watched apps, 0–60 second prompt delay (5 seconds by default), and reliable persistent vs best-effort background mode. Usage access (`UsageStatsManager`) detects the foreground app. Amount and Living bucket are entered in the notification shade; the payment app remains visible. The amount-only expense is initially flagged (`source: notification`) and bucket assignment clears the flag. No screenshot, overlay, or Accessibility.
+Settings → **Payment helper**. Usage access (`UsageStatsManager`) detects selected apps (defaults: eSewa / nBank) in the foreground. A notification appears after the chosen delay; amount is flagged until you assign a Living bucket. No screenshot, overlay, or Accessibility.
 
 ### Scan bubble (removed)
 
@@ -117,6 +117,7 @@ Screenshot overlay / MediaProjection is out of scope.
 - SQLite + Drizzle, on-device only
 - Zustand: playbook, buckets, transactions, goals, lending (contacts + lend/borrow entries)
 - Internal remark tokens: `__salary__`, `__savings_confirm__`
+- Settings can share a local markdown snapshot for Claude; nothing is uploaded until the user taps share.
 
 ---
 

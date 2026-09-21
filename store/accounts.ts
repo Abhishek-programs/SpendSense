@@ -45,6 +45,13 @@ interface AccountsState {
   applyIncome: (accountId: string | null | undefined, amount: number) => Promise<void>
   applyExpense: (accountId: string | null | undefined, amount: number) => Promise<void>
   addFoundMoney: (accountId: string, amount: number, note?: string) => Promise<void>
+  recordCashAdjustment: (args: {
+    id?: string
+    accountId: string
+    amount: number
+    note: string
+    date: string
+  }) => Promise<void>
   transfer: (fromId: string, toId: string, amount: number, note?: string) => Promise<void>
 }
 
@@ -141,6 +148,27 @@ export const useAccountsStore = create<AccountsState>((set, get) => ({
     })
     if (amount > 0) await creditAccount(accountId, amount)
     else await debitWithBankFallback(accountId, -amount)
+    await get().loadAccounts()
+  },
+
+  recordCashAdjustment: async ({ id, accountId, amount, note, date }) => {
+    if (amount === 0) return
+    const rowId = id || generateId()
+    const existing = await db
+      .select({ id: accountAdjustments.id })
+      .from(accountAdjustments)
+      .where(eq(accountAdjustments.id, rowId))
+      .limit(1)
+    if (existing.length > 0) return
+    const now = new Date().toISOString()
+    await db.insert(accountAdjustments).values({
+      id: rowId,
+      accountId,
+      amount,
+      note,
+      date,
+      createdAt: now,
+    })
     await get().loadAccounts()
   },
 

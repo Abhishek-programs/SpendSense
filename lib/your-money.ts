@@ -61,14 +61,19 @@ export function movedIntoNewPeriodAdjust(
   return addBack - lendingCashAdjustToday
 }
 
+function isIncomeShadowAdjustment(note: string | null | undefined): boolean {
+  return note === 'Income' || note === 'Income reversed'
+}
+
 export function foundMoneyInRange(
-  adjustments: { amount: number; date: string }[],
+  adjustments: { amount: number; date: string; note?: string | null }[],
   start: Date,
   end: Date,
 ): number {
   const startMs = start.getTime()
   const endMs = end.getTime()
   return adjustments.reduce((sum, a) => {
+    if (isIncomeShadowAdjustment(a.note)) return sum
     const ms = new Date(a.date).getTime()
     if (ms < startMs || ms > endMs) return sum
     return sum + a.amount

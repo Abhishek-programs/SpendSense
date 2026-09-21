@@ -33,7 +33,6 @@ object PaymentWatchDb {
         null,
         SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING,
       )
-      db.execSQL("PRAGMA busy_timeout=3000")
       ensureAccountColumn(db)
       val bucketId = fallbackBucketId(db)
       val now = isoNow()
@@ -66,7 +65,6 @@ object PaymentWatchDb {
         null,
         SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING,
       )
-      db.execSQL("PRAGMA busy_timeout=3000")
       ensureAccountColumn(db)
       val hit = resolveSpendingBucket(db, bucketHint) ?: return null
       val cursor = db.rawQuery(
@@ -88,16 +86,6 @@ object PaymentWatchDb {
       )
       if (wasFlagged && amount > 0) {
         debitWithBankFallback(db, accountId, amount)
-        if (hit.accumulates) {
-          db.execSQL(
-            """
-            UPDATE bucket_balances
-            SET balance = MAX(0, balance - ?), updated_at = ?
-            WHERE bucket_id = ?
-            """.trimIndent(),
-            arrayOf(amount, isoNow(), hit.id),
-          )
-        }
       }
       hit.name
     } catch (e: Exception) {
@@ -111,12 +99,7 @@ object PaymentWatchDb {
   fun spendingBucketNames(context: Context): Array<String> =
     spendingBuckets(context).map { it.name }.toTypedArray()
 
-  data class SpendingBucket(
-    val id: String,
-    val name: String,
-    val icon: String,
-    val accumulates: Boolean,
-  )
+  data class SpendingBucket(val id: String, val name: String, val icon: String)
 
   fun spendingBuckets(context: Context): List<SpendingBucket> {
     val dbFile = File(context.filesDir, "SQLite/spendsense.db")
@@ -124,7 +107,6 @@ object PaymentWatchDb {
     var db: SQLiteDatabase? = null
     return try {
       db = SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-      db.execSQL("PRAGMA busy_timeout=3000")
       loadSpendingBuckets(db)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to load buckets", e)
@@ -138,7 +120,7 @@ object PaymentWatchDb {
     // All active Living buckets (defaults + user-created). Ceilings before Personal fund.
     val cursor = db.rawQuery(
       """
-      SELECT id, name, COALESCE(icon, ''), accumulates FROM buckets
+      SELECT id, name, COALESCE(icon, '') FROM buckets
       WHERE is_active = 1 AND type = 'spending'
       ORDER BY accumulates ASC, sort_order ASC, name ASC
       """.trimIndent(),
@@ -150,8 +132,7 @@ object PaymentWatchDb {
         val id = it.getString(0) ?: continue
         val name = it.getString(1) ?: continue
         val icon = it.getString(2).orEmpty()
-        val accumulates = it.getInt(3) == 1
-        if (name.isNotBlank()) rows.add(SpendingBucket(id, name, icon, accumulates))
+        if (name.isNotBlank()) rows.add(SpendingBucket(id, name, icon))
       }
     }
     return rows

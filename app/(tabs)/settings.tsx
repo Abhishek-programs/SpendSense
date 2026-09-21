@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View,
   Text,
@@ -43,7 +43,10 @@ import { seedDefaults } from '@/db/seed'
 import { useLendingStore } from '@/store/lending'
 import { useAccountsStore } from '@/store/accounts'
 import { BANK_ACCOUNT_ID, ESEWA_ACCOUNT_ID } from '@/constants/accounts'
-
+import * as Clipboard from 'expo-clipboard'
+import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy'
+import * as Sharing from 'expo-sharing'
+import { buildClaudeSnapshot, CLAUDE_SHARE_PROMPT, snapshotFilename } from '@/lib/claude-snapshot'
 const BUCKET_TYPES: Bucket['type'][] = ['spending', 'savings', 'investment']
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
@@ -452,10 +455,13 @@ function MoneyLocationsCard() {
   )
 }
 
-function NotificationSettingsCard() {
+function PaymentWatchCard() {
   return (
     <>
-      <SectionHeader title="Notif." description="Payment notification and watched apps" />
+      <SectionHeader
+        title="Payment helper"
+        description="Log an amount from a notification while a payment app is open. Pick delay and apps here."
+      />
       <Card>
         <TouchableOpacity
           style={styles.mappingRow}
@@ -463,9 +469,9 @@ function NotificationSettingsCard() {
           accessibilityRole="button"
         >
           <View style={{ flex: 1 }}>
-            <Text style={styles.editableLabel}>Notification settings</Text>
+            <Text style={styles.editableLabel}>Delay and apps</Text>
             <Text style={styles.mappingBucket}>
-              Reliability, timing, and payment apps
+              Toggle, show-after delay, and watched apps
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -653,6 +659,70 @@ export default function SettingsScreen() {
   }
 
   const getBucketName = (id: string) => bs.buckets.find(b => b.id === id)?.name ?? 'Unknown'
+
+  const handleShareForClaude = async () => {
+    try {
+      if (txnStore.allTransactions.length === 0) {
+        await txnStore.loadAllTransactions()
+      }
+      if (useLendingStore.getState().allEntries.length === 0) {
+        await useLendingStore.getState().loadAllEntries()
+      }
+      const markdown = buildClaudeSnapshot({
+        playbook: {
+          userName: pb.userName,
+          userAge: pb.userAge,
+          monthlyIncome: pb.monthlyIncome,
+          monthStartDay: pb.monthStartDay,
+          earlyMonthStartDate: pb.earlyMonthStartDate,
+          efFloor: pb.efFloor,
+          efStartBalance: pb.efStartBalance,
+          carriedForwardBalance: pb.carriedForwardBalance,
+        },
+        buckets: bs.buckets,
+        transactions: useTransactionsStore.getState().allTransactions,
+        accounts: useAccountsStore.getState().accounts,
+        adjustments: useAccountsStore.getState().adjustments,
+        contacts: useLendingStore.getState().contacts,
+        entries: useLendingStore.getState().allEntries,
+        goals: goalsStore.goals.map(g => ({
+          name: g.name,
+          targetAmount: g.targetAmount,
+          monthlyContribution: g.monthlyContribution,
+          startBalance: g.startBalance,
+          linkedBucketIds: g.linkedBucketIds,
+          completedAt: g.completedAt ?? null,
+        })),
+        keywordMappings: bs.keywordMappings,
+        sureShotMerchants: bs.sureShotMerchants,
+      })
+      await Clipboard.setStringAsync(CLAUDE_SHARE_PROMPT)
+      const name = snapshotFilename()
+      const dir = cacheDirectory
+      if (!dir) throw new Error('Could not write the snapshot file.')
+      const path = `${dir}${name}`
+      await writeAsStringAsync(path, markdown)
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Share for Claude', 'Prompt copied. Sharing is not available on this device.')
+        return
+      }
+      try {
+        await Sharing.shareAsync(path, {
+          mimeType: 'text/markdown',
+          dialogTitle: 'Share for Claude',
+          UTI: 'public.plain-text',
+        })
+      } catch (shareError) {
+        const text = shareError instanceof Error ? shareError.message : ''
+        if (/cancel|dismiss|abort/i.test(text)) return
+        throw shareError
+      }
+      Alert.alert('Share for Claude', 'Prompt copied. Attach the file in Claude.')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not build the snapshot.'
+      Alert.alert('Share failed', message)
+    }
+  }
 
   const handleExportCSV = () => {
     const rows = txnStore.transactions
@@ -1124,7 +1194,7 @@ export default function SettingsScreen() {
 
         <MoneyLocationsCard />
 
-        <NotificationSettingsCard />
+        <PaymentWatchCard />
 
         {/* Section 5: Notifications */}
         <SectionHeader title="Notifications" description="Nudge preferences (max 1 per day, quiet 10pm-8am)" />
@@ -1155,8 +1225,12 @@ export default function SettingsScreen() {
         </Card>
 
         {/* Section 6: Data */}
-        <SectionHeader title="Data" description="Export your transactions" />
+        <SectionHeader title="Data" description="Stays on this phone until you share." />
         <Card>
+          <TouchableOpacity onPress={handleShareForClaude} style={styles.actionButton}>
+            <Text style={styles.actionButtonText}>Share for Claude</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
           <TouchableOpacity onPress={handleExportCSV} style={styles.actionButton}>
             <Text style={styles.actionButtonText}>Export CSV</Text>
           </TouchableOpacity>

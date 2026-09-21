@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { router } from 'expo-router'
+import Slider from '@react-native-community/slider'
 import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Card } from '@/components/ui/Card'
@@ -21,7 +22,6 @@ import {
   getPaymentWatchDelaySeconds,
   getPaymentWatchEnabled,
   getPaymentWatchLaunchableApps,
-  getPaymentWatchPersistent,
   getPaymentWatchTargetPackages,
   hasPaymentWatchNotificationPermission,
   hasPaymentWatchUsageAccess,
@@ -31,7 +31,6 @@ import {
   PaymentWatchApp,
   setPaymentWatchDelaySeconds,
   setPaymentWatchEnabled,
-  setPaymentWatchPersistent,
   setPaymentWatchTargetPackages,
 } from '@/lib/payment-watch'
 
@@ -41,8 +40,7 @@ export default function NotificationSettingsScreen() {
   const [enabled, setEnabled] = useState(false)
   const [usageAccess, setUsageAccess] = useState(false)
   const [notificationAccess, setNotificationAccess] = useState(false)
-  const [persistent, setPersistent] = useState(true)
-  const [delay, setDelay] = useState('5')
+  const [delay, setDelay] = useState(5)
   const [apps, setApps] = useState<PaymentWatchApp[]>([])
   const [selectedPackages, setSelectedPackages] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -53,12 +51,11 @@ export default function NotificationSettingsScreen() {
       return
     }
     try {
-      const [isEnabled, hasAccess, hasNotifications, isPersistent, delaySeconds, targets, launchable] =
+      const [isEnabled, hasAccess, hasNotifications, delaySeconds, targets, launchable] =
         await Promise.all([
           getPaymentWatchEnabled(),
           hasPaymentWatchUsageAccess(),
           hasPaymentWatchNotificationPermission(),
-          getPaymentWatchPersistent(),
           getPaymentWatchDelaySeconds(),
           getPaymentWatchTargetPackages(),
           getPaymentWatchLaunchableApps(),
@@ -66,12 +63,11 @@ export default function NotificationSettingsScreen() {
       setEnabled(isEnabled)
       setUsageAccess(hasAccess)
       setNotificationAccess(hasNotifications)
-      setPersistent(isPersistent)
-      setDelay(String(Math.round(delaySeconds)))
+      setDelay(delaySeconds)
       setSelectedPackages(targets)
       setApps(launchable)
     } catch {
-      Alert.alert('Could not load notification settings', 'Please try again.')
+      Alert.alert('Could not load payment helper', 'Please try again.')
     } finally {
       setLoading(false)
     }
@@ -135,15 +131,9 @@ export default function NotificationSettingsScreen() {
     await refresh()
   }
 
-  const togglePersistent = async (value: boolean) => {
-    setPersistent(value)
-    await setPaymentWatchPersistent(value)
-  }
-
-  const saveDelay = async () => {
-    const parsed = Number(delay)
-    const next = Number.isFinite(parsed) ? Math.round(Math.max(0, Math.min(60, parsed))) : 5
-    setDelay(String(next))
+  const saveDelay = async (seconds: number) => {
+    const next = Math.round(Math.max(0, Math.min(60, seconds)))
+    setDelay(next)
     await setPaymentWatchDelaySeconds(next)
   }
 
@@ -165,7 +155,7 @@ export default function NotificationSettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notif.</Text>
+        <Text style={styles.headerTitle}>Payment helper</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -190,18 +180,6 @@ export default function NotificationSettingsScreen() {
               value={enabled}
               onValueChange={toggleHelper}
             />
-            <View style={styles.divider} />
-            <SettingRow
-              label="Persistent helper"
-              detail="Keep detection reliable in the background"
-              value={persistent}
-              onValueChange={togglePersistent}
-            />
-            {!persistent && (
-              <Text style={styles.warning}>
-                Best-effort mode: Android may stop the helper, so some prompts can be missed.
-              </Text>
-            )}
             {enabled && !usageAccess && (
               <>
                 <View style={styles.divider} />
@@ -231,24 +209,25 @@ export default function NotificationSettingsScreen() {
 
           <Text style={styles.sectionTitle}>Timing</Text>
           <Card>
-            <View style={styles.delayRow}>
+            <View style={styles.delayHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowLabel}>Show after</Text>
                 <Text style={styles.rowDetail}>Delay after a selected app opens</Text>
               </View>
-              <TextInput
-                value={delay}
-                onChangeText={text => setDelay(text.replace(/[^0-9]/g, ''))}
-                onBlur={saveDelay}
-                onSubmitEditing={saveDelay}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                style={styles.delayInput}
-                selectTextOnFocus
-                accessibilityLabel="Notification delay in seconds"
-              />
-              <Text style={styles.seconds}>sec</Text>
+              <Text style={styles.seconds}>{delay} sec</Text>
             </View>
+            <Slider
+              minimumValue={0}
+              maximumValue={60}
+              step={1}
+              value={delay}
+              onValueChange={setDelay}
+              onSlidingComplete={saveDelay}
+              minimumTrackTintColor={colors.green}
+              maximumTrackTintColor={colors.border}
+              thumbTintColor={colors.green}
+              accessibilityLabel="Notification delay in seconds"
+            />
           </Card>
 
           <View style={styles.appsHeading}>
@@ -415,24 +394,15 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     color: colors.green,
   },
-  delayRow: { flexDirection: 'row', alignItems: 'center' },
-  delayInput: {
-    minWidth: 54,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.pageBg,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    textAlign: 'center',
+  delayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  seconds: {
     fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
     color: colors.textPrimary,
-  },
-  seconds: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textSecond,
     marginLeft: 6,
   },
   appsHeading: { flexDirection: 'row', alignItems: 'flex-end' },

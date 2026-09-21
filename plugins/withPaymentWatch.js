@@ -160,11 +160,13 @@ function withPaymentWatch(config) {
         $: {
           'android:name': '.paymentwatch.PaymentWatchBootReceiver',
           'android:exported': 'true',
+          'android:directBootAware': 'true',
         },
         'intent-filter': [
           {
             action: [
               { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
+              { $: { 'android:name': 'android.intent.action.LOCKED_BOOT_COMPLETED' } },
             ],
           },
         ],

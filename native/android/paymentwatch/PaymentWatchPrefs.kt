@@ -6,7 +6,6 @@ object PaymentWatchPrefs {
   private const val PREFS = "payment_watch"
   private const val KEY_ENABLED = "enabled"
   private const val KEY_PACKAGES = "packages"
-  private const val KEY_PERSISTENT_HELPER = "persistent_helper"
   private const val KEY_LOG_DELAY_MS = "log_delay_ms"
   private const val KEY_PENDING_TXN = "pending_txn_id"
   private const val KEY_PENDING_AMOUNT = "pending_amount"
@@ -27,17 +26,6 @@ object PaymentWatchPrefs {
       .apply()
   }
 
-  fun persistentHelper(context: Context): Boolean =
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-      .getBoolean(KEY_PERSISTENT_HELPER, true)
-
-  fun setPersistentHelper(context: Context, persistent: Boolean) {
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-      .edit()
-      .putBoolean(KEY_PERSISTENT_HELPER, persistent)
-      .apply()
-  }
-
   fun logDelayMs(context: Context): Long =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
       .getLong(KEY_LOG_DELAY_MS, DEFAULT_LOG_DELAY_MS)
@@ -51,12 +39,8 @@ object PaymentWatchPrefs {
   }
 
   fun targetPackages(context: Context): Set<String> {
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    val raw = if (prefs.contains(KEY_PACKAGES)) {
-      prefs.getString(KEY_PACKAGES, "").orEmpty()
-    } else {
-      DEFAULT_PACKAGES
-    }
+    val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .getString(KEY_PACKAGES, DEFAULT_PACKAGES) ?: DEFAULT_PACKAGES
     return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
   }
 
@@ -64,7 +48,7 @@ object PaymentWatchPrefs {
     val joined = packages.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(",")
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
       .edit()
-      .putString(KEY_PACKAGES, joined)
+      .putString(KEY_PACKAGES, if (joined.isEmpty()) DEFAULT_PACKAGES else joined)
       .apply()
   }
 

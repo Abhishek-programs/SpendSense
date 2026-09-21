@@ -14,7 +14,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import {{PACKAGE}}.R
@@ -25,7 +24,6 @@ class PaymentWatchService : Service() {
   private var eventCursor = 0L
   private var lastUiKind: String? = null
   private var waitingForDelay = false
-  private var nonTargetSince = 0L
 
   private val showLogLater = Runnable {
     waitingForDelay = false
@@ -46,7 +44,7 @@ class PaymentWatchService : Service() {
     eventCursor = 0L
     ensureChannels()
     startAsForeground(placeholderNotification())
-    applyServiceMode()
+    demoteFromForeground()
     val prev = lastTarget
     refreshTarget()
     onTargetChanged(prev, lastTarget)
@@ -59,28 +57,8 @@ class PaymentWatchService : Service() {
       stopSelf()
       return START_NOT_STICKY
     }
-    startAsForeground(
-      if (PaymentWatchPrefs.persistentHelper(this)) {
-        desiredNotification() ?: placeholderNotification()
-      } else {
-        placeholderNotification()
-      },
-    )
-    if (intent?.action == ACTION_RECONFIGURE) {
-      val wasWaiting = waitingForDelay
-      handler.removeCallbacks(showLogLater)
-      waitingForDelay = false
-      nonTargetSince = 0L
-      val currentTarget = lastTarget
-      if (currentTarget != null && currentTarget !in PaymentWatchPrefs.targetPackages(this)) {
-        lastTarget = null
-        PaymentWatchPrefs.setDoneThisVisit(this, false)
-      } else if (wasWaiting && currentTarget != null) {
-        waitingForDelay = true
-        handler.postDelayed(showLogLater, PaymentWatchPrefs.logDelayMs(this))
-      }
-    }
-    applyServiceMode()
+    startAsForeground(placeholderNotification())
+    demoteFromForeground()
     val prev = lastTarget
     refreshTarget()
     onTargetChanged(prev, lastTarget)
@@ -91,10 +69,7 @@ class PaymentWatchService : Service() {
   override fun onDestroy() {
     handler.removeCallbacks(poll)
     handler.removeCallbacks(showLogLater)
-    getSystemService(NotificationManager::class.java)?.apply {
-      cancel(NOTIF_ID)
-      cancel(LOG_NOTIF_ID)
-    }
+    getSystemService(NotificationManager::class.java)?.cancel(LOG_NOTIF_ID)
     super.onDestroy()
   }
 
@@ -127,19 +102,7 @@ class PaymentWatchService : Service() {
 
   private fun refreshTarget() {
     val fg = applyForegroundEvents()
-    val target = fg?.takeIf { it in PaymentWatchPrefs.targetPackages(this) }
-    if (target != null) {
-      nonTargetSince = 0L
-      lastTarget = target
-      return
-    }
-    if (lastTarget == null) return
-    val now = System.currentTimeMillis()
-    if (nonTargetSince == 0L) nonTargetSince = now
-    if (now - nonTargetSince >= EXIT_GRACE_MS) {
-      nonTargetSince = 0L
-      lastTarget = null
-    }
+    lastTarget = fg?.takeIf { it in PaymentWatchPrefs.targetPackages(this) }
   }
 
   private fun applyForegroundEvents(): String? {
@@ -154,31 +117,17 @@ class PaymentWatchService : Service() {
       val isResume =
         event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
           event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
-      if (isResume && !isTransientForeground(event.packageName)) {
-        foregroundPkg = event.packageName
-      }
+      if (isResume) foregroundPkg = event.packageName
     }
     eventCursor = end
     return foregroundPkg
-  }
-
-  private fun isTransientForeground(packageName: String): Boolean {
-    if (packageName == "com.android.systemui") return true
-    val inputMethod = Settings.Secure.getString(
-      contentResolver,
-      Settings.Secure.DEFAULT_INPUT_METHOD,
-    ).orEmpty().substringBefore('/')
-    return packageName == inputMethod
   }
 
   private fun publishWatchUi() {
     lastUiKind = uiKind()
     val nm = getSystemService(NotificationManager::class.java)
     val notification = desiredNotification()
-    if (PaymentWatchPrefs.persistentHelper(this)) {
-      nm?.cancel(LOG_NOTIF_ID)
-      startAsForeground(notification ?: placeholderNotification())
-    } else if (notification != null) {
+    if (notification != null) {
       nm?.notify(LOG_NOTIF_ID, notification)
     } else if (!PaymentWatchPrefs.shouldHoldCancel(this)) {
       nm?.cancel(LOG_NOTIF_ID)
@@ -208,14 +157,6 @@ class PaymentWatchService : Service() {
       stopForeground(true)
     }
     getSystemService(NotificationManager::class.java)?.cancel(NOTIF_ID)
-  }
-
-  private fun applyServiceMode() {
-    if (PaymentWatchPrefs.persistentHelper(this)) {
-      startAsForeground(desiredNotification() ?: placeholderNotification())
-    } else {
-      demoteFromForeground()
-    }
   }
 
   private fun startAsForeground(notification: Notification) {
@@ -262,26 +203,6 @@ class PaymentWatchService : Service() {
   private fun categoryNotification(pending: PaymentWatchPrefs.PendingTxn): Notification {
     val npr = pending.amount.toInt()
     val title = "NPR $npr · ${pending.merchant}"
-    val bucketInput = RemoteInput.Builder(KEY_BUCKET)
-      .setLabel("Choose bucket")
-      .setChoices(PaymentWatchDb.spendingBucketNames(this))
-      .setAllowFreeFormInput(true)
-      .build()
-    val assignIntent = Intent(this, PaymentWatchReceiver::class.java).apply {
-      action = ACTION_ASSIGN
-      putExtra(EXTRA_TXN_ID, pending.id)
-    }
-    val assignPending = PendingIntent.getBroadcast(
-      this,
-      pending.id.hashCode(),
-      assignIntent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-    )
-    val choose = NotificationCompat.Action.Builder(
-      android.R.drawable.ic_menu_save,
-      "Choose bucket",
-      assignPending,
-    ).addRemoteInput(bucketInput).build()
     val pickIntent = Intent(this, PaymentWatchPickActivity::class.java).apply {
       putExtra(PaymentWatchPickActivity.EXTRA_TXN_ID, pending.id)
       putExtra(PaymentWatchPickActivity.EXTRA_AMOUNT, pending.amount)
@@ -294,6 +215,12 @@ class PaymentWatchService : Service() {
       pickIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+    val open = NotificationCompat.Action.Builder(
+      android.R.drawable.ic_menu_agenda,
+      "Pick bucket",
+      pickPending,
+    ).build()
+
     return NotificationCompat.Builder(this, CHANNEL_LOG)
       .setSmallIcon(R.drawable.ic_stat_spendsense)
       .setContentTitle(title)
@@ -301,7 +228,7 @@ class PaymentWatchService : Service() {
       .setContentIntent(pickPending)
       .setOngoing(true)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
-      .addAction(choose)
+      .addAction(open)
       .build()
   }
 
@@ -343,13 +270,11 @@ class PaymentWatchService : Service() {
     const val CHANNEL_LOG = "payment_watch_log"
     const val ACTION_LOG = "{{PACKAGE}}.paymentwatch.LOG"
     const val ACTION_ASSIGN = "{{PACKAGE}}.paymentwatch.ASSIGN"
-    const val ACTION_RECONFIGURE = "{{PACKAGE}}.paymentwatch.RECONFIGURE"
     const val KEY_AMOUNT = "payment_watch_amount"
     const val KEY_BUCKET = "payment_watch_bucket"
     const val EXTRA_PACKAGE = "payment_watch_package"
     const val EXTRA_TXN_ID = "payment_watch_txn_id"
     private const val POLL_MS = 1500L
-    private const val EXIT_GRACE_MS = 3000L
 
     fun start(context: Context) {
       if (!PaymentWatchPrefs.isEnabled(context) || !PaymentWatchAccess.hasUsageAccess(context)) return
@@ -365,23 +290,7 @@ class PaymentWatchService : Service() {
       context.stopService(Intent(context, PaymentWatchService::class.java))
     }
 
-    fun reconfigure(context: Context) {
-      if (!PaymentWatchPrefs.isEnabled(context) || !PaymentWatchAccess.hasUsageAccess(context)) return
-      val intent = Intent(context, PaymentWatchService::class.java).apply {
-        action = ACTION_RECONFIGURE
-      }
-      if (Build.VERSION.SDK_INT >= 26) {
-        context.startForegroundService(intent)
-      } else {
-        context.startService(intent)
-      }
-    }
-
     fun clearLogUi(context: Context) {
-      if (PaymentWatchPrefs.persistentHelper(context)) {
-        start(context)
-        return
-      }
       val nm = context.getSystemService(NotificationManager::class.java) ?: return
       PaymentWatchPrefs.holdCancelUntil(context, System.currentTimeMillis() + 2500)
       val done = NotificationCompat.Builder(context, CHANNEL_LOG)
